@@ -1,0 +1,33 @@
+{
+  "welcome": "Chào mừng đến với Furniture Shop",
+  "auth": {
+    "login_success": "Đăng nhập thành công",
+    "register_success": "Đăng ký thành công",
+    "invalid_credentials": "Email hoặc mật khẩu không đúng",
+    "email_exists": "Email đã được sử dụng",
+    "logout_success": "Đăng xuất thành công",
+    "requires_2fa": "Yêu cầu mã xác thực 2 lớp",
+    "invalid_2fa": "Mã 2FA không đúng",
+    "2fa_enabled": "Đã bật xác thực 2 lớp thành công",
+    "2fa_disabled": "Đã tắt xác thực 2 lớp"
+  },
+  "product": {
+    "not_found": "Không tìm thấy sản phẩm",
+    "created": "Tạo sản phẩm thành công"
+  },
+  "cart": {
+    "empty": "Giỏ hàng trống",
+    "added": "Đã thêm vào giỏ hàng",
+    "out_of_stock": "Số lượng vượt quá tồn kho"
+  },
+  "order": {
+    "created": "Đặt hàng thành công",
+    "not_found": "Không tìm thấy đơn hàng",
+    "cancelled": "Hủy đơn hàng thành công",
+    "cannot_cancel": "Chỉ có thể hủy đơn hàng đang chờ xử lý"
+  },
+  "validation": {
+    "required": "Trường này không được để trống",
+    "invalid_email": "Email không hợp lệ"
+  }
+}
