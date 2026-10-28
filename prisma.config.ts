@@ -1,0 +1,15 @@
+import 'dotenv/config';
+import { defineConfig } from 'prisma/config';
+
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  datasource: {
+    url: 'file:./prisma/dev.db',
+  },
+});
+// export default defineConfig({
+//   schema: 'prisma/schema.prisma',
+//   datasource: {
+//     url: 'file:./prisma/dev.db', // Sử dụng đường dẫn tương đối chuẩn cho SQLite
+//   },
+// });
