@@ -106,6 +106,12 @@ export class ProductsService {
     } = query;
 
     const skip = (page - 1) * limit;
+    const cacheKey = `products:list:${JSON.stringify(query)}`;
+
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     const where: Prisma.ProductWhereInput = {
       isActive,
@@ -179,7 +185,7 @@ export class ProductsService {
       })),
     }));
 
-    return {
+    const result = {
       data,
       meta: {
         page,
@@ -188,9 +194,20 @@ export class ProductsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+
+    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000); // 5 phút
+
+    return result;
   }
 
   async findOne(id: number) {
+    const cacheKey = `product:id:${id}`;
+
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
@@ -212,59 +229,73 @@ export class ProductsService {
       throw new NotFoundException(`Không tìm thấy sản phẩm với id ${id}`);
     }
 
-    return {
+    const result = {
       ...product,
       variants: product.variants.map((v) => ({
         ...v,
         attributes: v.attributes ? JSON.parse(v.attributes) : null,
       })),
     };
+
+    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000); // 5 phút
+
+    return result;
   }
 
-  async findBySlug(slug: string) {
-    const cacheKey = `product:slug:${slug}`;
+async findBySlug(slug: string) {
+  const cacheKey = `product:slug:${slug}`;
 
-    // Lấy từ cache
-    const cached = await this.cacheManager.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
+  const cached = await this.cacheManager.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
-    const product = await this.prisma.product.findUnique({
-      where: { slug },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        variants: true,
-        category: true,
-        brand: true,
-        reviews: {
-          include: {
-            user: { select: { id: true, name: true, avatar: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 10,
+  const product = await this.prisma.product.findUnique({
+    where: { slug },
+    include: {
+      images: { orderBy: { sortOrder: 'asc' } },
+      variants: true,
+      category: true,
+      brand: true,
+      reviews: {
+        include: {
+          user: { select: { id: true, name: true, avatar: true } },
         },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
       },
-    });
+    },
+  });
 
-    if (!product) {
-      throw new NotFoundException(`Không tìm thấy sản phẩm với slug ${slug}`);
-    }
-
-    // Lưu cache 5 phút
-    await this.cacheManager.set(cacheKey, product, 5 * 60 * 1000);
-
-    return {
-      ...product,
-      variants: product.variants.map((v) => ({
-        ...v,
-        attributes: v.attributes ? JSON.parse(v.attributes) : null,
-      })),
-    };
+  if (!product) {
+    throw new NotFoundException(`Không tìm thấy sản phẩm với slug ${slug}`);
   }
+
+  const result = {
+    ...product,
+    // Decimal → number để Redis JSON ổn định
+    price: Number(product.price),
+    salePrice: product.salePrice != null ? Number(product.salePrice) : null,
+    variants: product.variants.map((v) => ({
+      ...v,
+      price: v.price != null ? Number(v.price) : null,
+      attributes: v.attributes ? JSON.parse(v.attributes as string) : null,
+    })),
+  };
+
+  await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000); // 5 phút
+
+  return result;
+}
 
   async update(id: number, dto: UpdateProductDto) {
-    await this.findOne(id);
+    const oldProduct = await this.prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!oldProduct) {
+      throw new NotFoundException(`Không tìm thấy sản phẩm với id ${id}`);
+    }
 
     if (dto.slug) {
       const existing = await this.prisma.product.findFirst({
@@ -275,7 +306,7 @@ export class ProductsService {
       }
     }
 
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: dto,
       include: {
@@ -285,10 +316,34 @@ export class ProductsService {
         brand: true,
       },
     });
+
+    // Clear cache
+    await this.cacheManager.del(`product:id:${id}`);
+    await this.cacheManager.del(`product:slug:${oldProduct.slug}`);
+    if (dto.slug) {
+      await this.cacheManager.del(`product:slug:${dto.slug}`);
+    }
+    // Clear all product list cache (pattern-based)
+    // Note: cache-manager không hỗ trợ pattern deletion, nên chỉ clear list cache khi cần thiết
+
+    return updated;
   }
 
   async remove(id: number) {
-    await this.findOne(id);
-    return this.prisma.product.delete({ where: { id } });
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Không tìm thấy sản phẩm với id ${id}`);
+    }
+
+    const deleted = await this.prisma.product.delete({ where: { id } });
+
+    // Clear cache
+    await this.cacheManager.del(`product:id:${id}`);
+    await this.cacheManager.del(`product:slug:${product.slug}`);
+
+    return deleted;
   }
 }
