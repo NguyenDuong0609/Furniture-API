@@ -1,19 +1,14 @@
 import {
   WebSocketGateway,
   WebSocketServer,
-  SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  MessageBody,
-  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
-  cors: {
-    origin: '*', // production nên giới hạn domain
-  },
+  cors: { origin: '*' },
   namespace: '/events',
 })
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -21,18 +16,37 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private readonly logger = new Logger(EventsGateway.name);
-
-  // Lưu userId → socketId
   private userSockets = new Map<number, string>();
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
+
+    // Xử lý join trực tiếp trên socket (đáng tin hơn @SubscribeMessage trong case này)
+    client.on('join', (data: any) => {
+      this.logger.log(`join payload: ${JSON.stringify(data)}`);
+
+      const userId =
+        data?.userId ??
+        data?.data?.userId ??
+        (typeof data === 'number' ? data : null);
+
+      if (!userId) {
+        this.logger.warn('join thiếu userId');
+        client.emit('joined', { success: false, message: 'userId required' });
+        return;
+      }
+
+      const id = Number(userId);
+      this.userSockets.set(id, client.id);
+      client.join(`user_${id}`);
+
+      this.logger.log(`User ${id} joined room user_${id}`);
+      client.emit('joined', { success: true, userId: id });
+    });
   }
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
-
-    // Xóa mapping khi disconnect
     for (const [userId, socketId] of this.userSockets.entries()) {
       if (socketId === client.id) {
         this.userSockets.delete(userId);
@@ -41,40 +55,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  /**
-   * Client gửi userId sau khi login để join room
-   */
-  @SubscribeMessage('join')
-  handleJoin(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { userId: number },
-  ) {
-    if (data?.userId) {
-      this.userSockets.set(data.userId, client.id);
-      client.join(`user_${data.userId}`);
-      this.logger.log(`User ${data.userId} joined room`);
-    }
-    return { event: 'joined', data: { success: true } };
-  }
-
-  /**
-   * Gửi thông báo đến 1 user cụ thể
-   */
   sendToUser(userId: number, event: string, data: any) {
     this.server.to(`user_${userId}`).emit(event, data);
   }
 
-  /**
-   * Gửi thông báo đến tất cả admin (room admin)
-   */
   sendToAdmins(event: string, data: any) {
     this.server.to('admins').emit(event, data);
   }
 
-  /**
-   * Broadcast đến tất cả client
-   */
   broadcast(event: string, data: any) {
+    this.logger.log(`Broadcast ${event}: ${JSON.stringify(data)}`);
     this.server.emit(event, data);
   }
 }
