@@ -4,7 +4,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { SharedModule } from './shared/shared.module.js';
 // import { PostsModule } from './posts/posts.module.js';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { envValidationSchema } from './config/env.validation.js';
 import { AuthModule } from './auth/auth.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -13,6 +13,8 @@ import { ProductsModule } from './products/products.module.js';
 import { CartsModule } from './carts/carts.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
+import Keyv from 'keyv';
+import KeyvRedis from '@keyv/redis';
 import {
   AcceptLanguageResolver,
   HeaderResolver,
@@ -27,6 +29,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
 import { BullModule } from '@nestjs/bullmq';
+import { QueuesModule } from './queues/queues.module.js';
+import { createKeyv } from 'keyv';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -74,21 +78,26 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ]),
     CacheModule.registerAsync({
       isGlobal: true,
-      useFactory: async () => ({
-        store: await redisStore({
-          url: process.env.REDIS_URL || 'redis://localhost:6379',
-          ttl: 60 * 1000, // 60 giây
-        }),
-      }),
-    }),
-    BullModule.forRoot({
-      connection: {
-        host: 'localhost',
-        port: 6379,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => {
+        const keyv = new Keyv(
+          new KeyvRedis(config.get<string>('REDIS_URL', 'redis://localhost:6379')),
+        );
+        return {
+          stores: [keyv],
+          ttl: 60_000, // ms — TTL mặc định
+        };
       },
     }),
-    BullModule.registerQueue({
-      name: 'email',
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST', 'localhost'),
+          port: config.get<number>('REDIS_PORT', 6379),
+        },
+      }),
     }),
     SharedModule,
     // PostsModule,
@@ -102,6 +111,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     UsersModule,
     MediaModule,
     EventsModule,
+    QueuesModule,
   ],
   controllers: [AppController],
   providers: [
