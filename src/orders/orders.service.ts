@@ -9,12 +9,14 @@ import { GetOrdersDto } from './dto/get-orders.dto.js';
 import { randomBytes } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.js';
+import { OrderQueueService } from '../queues/order-queue.service.js';
 
 @Injectable()
 export class OrdersService {
   constructor(
-    private readonly prisma: PrismaService, 
-    private readonly eventsGateway: EventsGateway
+    private readonly prisma: PrismaService,
+    private readonly eventsGateway: EventsGateway,
+    private readonly orderQueueService: OrderQueueService,
   ) {}
 
   private generateOrderCode(): string {
@@ -122,19 +124,44 @@ export class OrdersService {
       });
 
       // Trừ tồn kho
-      for (const item of cart.items) {
-        if (item.variantId) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { decrement: item.quantity } },
-          });
-        } else {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
-          });
-        }
-      }
+      // Trong transaction, sau khi tạo order + order items:
+
+for (const item of cart.items) {
+  if (item.variantId) {
+    // Chỉ trừ khi còn đủ hàng
+    const updated = await tx.productVariant.updateMany({
+      where: {
+        id: item.variantId,
+        stock: { gte: item.quantity }, // đủ stock mới update
+      },
+      data: {
+        stock: { decrement: item.quantity },
+      },
+    });
+
+    if (updated.count === 0) {
+      throw new BadRequestException(
+        `Sản phẩm "${item.product.name}" không đủ số lượng trong kho`,
+      );
+    }
+  } else {
+    const updated = await tx.product.updateMany({
+      where: {
+        id: item.productId,
+        stock: { gte: item.quantity },
+      },
+      data: {
+        stock: { decrement: item.quantity },
+      },
+    });
+
+    if (updated.count === 0) {
+      throw new BadRequestException(
+        `Sản phẩm "${item.product.name}" không đủ số lượng trong kho`,
+      );
+    }
+  }
+}
 
       // Xóa giỏ hàng sau khi đặt thành công
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
@@ -158,10 +185,43 @@ export class OrdersService {
       });
     }
 
-    return {
-      message: 'Đặt hàng thành công',
-      order,
-    };
+    // return {
+    //   message: 'Đặt hàng thành công',
+    //   order,
+    // };
+    // Websocket (đã có)
+this.eventsGateway.broadcast('newOrder', {
+  orderId: order.id,
+  orderCode: order.code,
+  totalAmount: order.totalAmount,
+  createdAt: order.createdAt,
+});
+
+if (userId) {
+  this.eventsGateway.sendToUser(userId, 'orderCreated', {
+    message: 'Đặt hàng thành công',
+    order,
+  });
+}
+
+// Queue nền (thêm)
+await this.orderQueueService.addSendOrderEmailJob({
+  orderId: order.id,
+  orderCode: order.code,
+  email: undefined, // sau này lấy từ user.email
+  totalAmount: order.totalAmount.toNumber(),
+});
+
+await this.orderQueueService.addNotifyAdminJob({
+  orderId: order.id,
+  orderCode: order.code,
+  totalAmount: order.totalAmount.toNumber(),
+});
+
+return {
+  message: 'Đặt hàng thành công',
+  order,
+};
   }
 
   /**
