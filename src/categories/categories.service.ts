@@ -6,10 +6,16 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
+import { Inject } from '@nestjs/common';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   async create(dto: CreateCategoryDto) {
     // Kiểm tra slug trùng
@@ -42,7 +48,14 @@ export class CategoriesService {
   }
 
   async findAll() {
-    return this.prisma.category.findMany({
+    const cacheKey = 'categories:all';
+
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const categories = await this.prisma.category.findMany({
       where: { parentId: null }, // chỉ lấy danh mục gốc
       include: {
         children: {
@@ -56,9 +69,20 @@ export class CategoriesService {
       },
       orderBy: { name: 'asc' },
     });
+
+    await this.cacheManager.set(cacheKey, categories, 10 * 60 * 1000); // 10 phút
+
+    return categories;
   }
 
   async findOne(id: number) {
+    const cacheKey = `category:id:${id}`;
+
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const category = await this.prisma.category.findUnique({
       where: { id },
       include: {
@@ -74,10 +98,19 @@ export class CategoriesService {
       throw new NotFoundException(`Không tìm thấy danh mục với id ${id}`);
     }
 
+    await this.cacheManager.set(cacheKey, category, 10 * 60 * 1000); // 10 phút
+
     return category;
   }
 
   async findBySlug(slug: string) {
+    const cacheKey = `category:slug:${slug}`;
+
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const category = await this.prisma.category.findUnique({
       where: { slug },
       include: {
@@ -94,11 +127,19 @@ export class CategoriesService {
       throw new NotFoundException(`Không tìm thấy danh mục với slug ${slug}`);
     }
 
+    await this.cacheManager.set(cacheKey, category, 10 * 60 * 1000); // 10 phút
+
     return category;
   }
 
   async update(id: number, dto: UpdateCategoryDto) {
-    await this.findOne(id);
+    const oldCategory = await this.prisma.category.findUnique({
+      where: { id },
+    });
+
+    if (!oldCategory) {
+      throw new NotFoundException(`Không tìm thấy danh mục với id ${id}`);
+    }
 
     if (dto.slug) {
       const existing = await this.prisma.category.findFirst({
@@ -112,17 +153,33 @@ export class CategoriesService {
       }
     }
 
-    return this.prisma.category.update({
+    const updated = await this.prisma.category.update({
       where: { id },
       data: {
         ...dto,
         image: dto.image === '' ? null : dto.image,
       },
     });
+
+    // Clear cache
+    await this.cacheManager.del(`category:id:${id}`);
+    await this.cacheManager.del(`category:slug:${oldCategory.slug}`);
+    if (dto.slug) {
+      await this.cacheManager.del(`category:slug:${dto.slug}`);
+    }
+    await this.cacheManager.del('categories:all');
+
+    return updated;
   }
 
   async remove(id: number) {
-    await this.findOne(id);
+    const category = await this.prisma.category.findUnique({
+      where: { id },
+    });
+
+    if (!category) {
+      throw new NotFoundException(`Không tìm thấy danh mục với id ${id}`);
+    }
 
     // Kiểm tra còn sản phẩm không
     const productCount = await this.prisma.product.count({
@@ -134,8 +191,15 @@ export class CategoriesService {
       );
     }
 
-    return this.prisma.category.delete({
+    const deleted = await this.prisma.category.delete({
       where: { id },
     });
+
+    // Clear cache
+    await this.cacheManager.del(`category:id:${id}`);
+    await this.cacheManager.del(`category:slug:${category.slug}`);
+    await this.cacheManager.del('categories:all');
+
+    return deleted;
   }
 }
