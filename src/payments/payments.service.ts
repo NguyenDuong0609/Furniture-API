@@ -6,10 +6,11 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
 import { randomBytes } from 'crypto';
+import { EventsGateway } from '../events/events.gateway.js';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly eventsGateway: EventsGateway) {}
 
   /**
    * Xác nhận thanh toán COD (Admin hoặc hệ thống)
@@ -80,6 +81,99 @@ export class PaymentsService {
     };
   }
 
+  /**
+ * Xử lý Webhook từ SePay khi có tiền vào
+ */
+async handleSePayWebhook(payload: any, signature?: string, rawBody?: string) {
+  // 1. (Khuyến nghị) Verify chữ ký nếu dùng HMAC
+  // if (signature && rawBody) {
+  //   const expected = createHmac('sha256', process.env.SEPAY_WEBHOOK_SECRET)
+  //     .update(rawBody)
+  //     .digest('hex');
+  //   // so sánh an toàn...
+  // }
+
+  const {
+    id: transactionId,
+    transferType,
+    transferAmount,
+    content,
+    referenceCode,
+    transactionDate,
+  } = payload;
+
+  // Chỉ xử lý tiền vào
+  if (transferType !== 'in') {
+    return { success: true, message: 'Bỏ qua giao dịch tiền ra' };
+  }
+
+  // Tìm mã đơn hàng trong nội dung chuyển khoản
+  // Ví dụ nội dung: "DH20241014ABC123 thanh toan don hang", "HD91836883"
+  const orderCodeMatch = content?.match(/(ORD[A-Z0-9]+)/i) || content?.match(/(DH[A-Z0-9]+)/i) || content?.match(/(HD[A-Z0-9]+)/i);
+
+  if (!orderCodeMatch) {
+    return { success: true, message: 'Không tìm thấy mã đơn hàng trong nội dung' };
+  }
+
+  const orderCode = orderCodeMatch[1].toUpperCase();
+
+  const order = await this.prisma.order.findUnique({
+    where: { code: orderCode },
+  });
+
+  if (!order) {
+    return { success: true, message: `Không tìm thấy đơn hàng ${orderCode}` };
+  }
+
+  if (order.paymentStatus === 'PAID') {
+    return { success: true, message: 'Đơn hàng đã được thanh toán trước đó' };
+  }
+
+  // Kiểm tra số tiền (cho phép sai số nhỏ nếu cần)
+  const amount = Number(transferAmount);
+  if (amount < Number(order.totalAmount)) {
+    // Có thể ghi log thanh toán thiếu
+    return { success: true, message: 'Số tiền chuyển khoản chưa đủ' };
+  }
+
+  // Cập nhật đơn hàng
+  await this.prisma.order.update({
+    where: { id: order.id },
+    data: {
+      paymentStatus: 'PAID',
+      status: 'CONFIRMED',
+      paymentMethod: 'BANK_TRANSFER',
+      // Có thể thêm field sepayTransactionId nếu muốn
+    },
+  });
+
+  // Gửi thông báo realtime
+  if (order.userId) {
+    // Nếu có userId, gửi notification cho user
+    this.eventsGateway.sendToUser(order.userId, 'orderPaid', { orderCode });
+  } else {
+    // Nếu không có userId (khách vãng lai), broadcast cho admin
+    this.eventsGateway.sendToAdmins('orderPaid', { orderCode, isGuest: true });
+  }
+
+  return {
+    success: true,
+    message: `Đã xác nhận thanh toán đơn hàng ${orderCode}`,
+  };
+}
+
+/**
+ * Tạo thông tin chuyển khoản để hiển thị cho khách
+ */
+getBankTransferInfo(order: { code: string; totalAmount: any }) {
+  return {
+    bankAccount: process.env.SEPAY_BANK_ACCOUNT,
+    accountName: process.env.SEPAY_ACCOUNT_NAME,
+    amount: Number(order.totalAmount),
+    content: order.code,           // Bắt buộc khách chuyển đúng nội dung này
+    qrUrl: `https://img.vietqr.io/image/${process.env.SEPAY_BANK_ACCOUNT}-${order.totalAmount}-${order.code}.png`, // VietQR
+  };
+}
   /**
    * Callback từ cổng thanh toán (IPN / Return URL)
    * Frontend hoặc cổng thanh toán sẽ gọi API này

@@ -76,7 +76,7 @@ export class ProductsService {
                 sku: v.sku,
                 price: v.price,
                 stock: v.stock ?? 0,
-                attributes: v.attributes ? JSON.stringify(v.attributes) : null,
+                attributes: v.attributes ?? undefined,
               })),
             }
           : undefined,
@@ -177,16 +177,16 @@ export class ProductsService {
     ]);
 
     // Parse attributes JSON
-    const data = products.map((p) => ({
-      ...p,
-      variants: p.variants.map((v) => ({
-        ...v,
-        attributes: v.attributes ? JSON.parse(v.attributes) : null,
-      })),
-    }));
+    // const data = products.map((p) => ({
+    //   ...p,
+    //   variants: p.variants.map((v) => ({
+    //     ...v,
+    //     attributes: v.attributes ? JSON.parse(v.attributes) : null,
+    //   })),
+    // }));
 
     const result = {
-      data,
+      data: products,
       meta: {
         page,
         limit,
@@ -231,10 +231,7 @@ export class ProductsService {
 
     const result = {
       ...product,
-      variants: product.variants.map((v) => ({
-        ...v,
-        attributes: v.attributes ? JSON.parse(v.attributes) : null,
-      })),
+      variants: product.variants,
     };
 
     await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000); // 5 phút
@@ -279,7 +276,7 @@ async findBySlug(slug: string) {
     variants: product.variants.map((v) => ({
       ...v,
       price: v.price != null ? Number(v.price) : null,
-      attributes: v.attributes ? JSON.parse(v.attributes as string) : null,
+      attributes: v.attributes ?? null,
     })),
   };
 

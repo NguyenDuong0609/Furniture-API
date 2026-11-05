@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // ==================== USER & AUTH ====================
@@ -145,7 +145,7 @@ model ProductVariant {
   sku        String?  @unique
   price      Decimal?
   stock      Int      @default(0)
-  attributes String?  // JSON string: {"color":"Gray","material":"Oak","size":"L"}
+  attributes Json?  // JSON string: {"color":"Gray","material":"Oak","size":"L"}
   productId  Int
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems  CartItem[]

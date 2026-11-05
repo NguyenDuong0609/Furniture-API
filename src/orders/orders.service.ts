@@ -10,13 +10,16 @@ import { randomBytes } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.js';
 import { OrderQueueService } from '../queues/order-queue.service.js';
+import { PaymentsService } from '../payments/payments.service.js';
 
 @Injectable()
 export class OrdersService {
+  [x: string]: any;
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventsGateway: EventsGateway,
     private readonly orderQueueService: OrderQueueService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   private generateOrderCode(): string {
@@ -221,6 +224,7 @@ await this.orderQueueService.addNotifyAdminJob({
 return {
   message: 'Đặt hàng thành công',
   order,
+  bankTransfer: this.paymentsService.getBankTransferInfo(order),
 };
   }
 

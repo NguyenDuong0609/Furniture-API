@@ -43,6 +43,23 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.log(`User ${id} joined room user_${id}`);
       client.emit('joined', { success: true, userId: id });
     });
+
+    // Admin join vào room admins để nhận notification từ đơn hàng vãng lai
+    client.on('joinAdmin', (data: any) => {
+      this.logger.log(`joinAdmin payload: ${JSON.stringify(data)}`);
+
+      const isAdmin = data?.isAdmin ?? data?.data?.isAdmin ?? false;
+
+      if (!isAdmin) {
+        this.logger.warn('joinAdmin thiếu isAdmin flag');
+        client.emit('joinedAdmin', { success: false, message: 'isAdmin required' });
+        return;
+      }
+
+      client.join('admins');
+      this.logger.log(`Admin joined room admins`);
+      client.emit('joinedAdmin', { success: true });
+    });
   }
 
   handleDisconnect(client: Socket) {

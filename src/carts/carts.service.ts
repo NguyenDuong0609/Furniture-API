@@ -167,8 +167,7 @@ export class CartsService {
           ? {
               ...item.variant,
               attributes: item.variant.attributes
-                ? JSON.parse(item.variant.attributes)
-                : null,
+                ?? null,
             }
           : null,
       };

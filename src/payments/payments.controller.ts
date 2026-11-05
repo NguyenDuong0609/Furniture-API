@@ -5,6 +5,7 @@ import {
   Body,
   Query,
   Param,
+  Headers,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
@@ -35,7 +36,31 @@ export class PaymentsController {
   ) {
     return this.paymentsService.createPaymentUrl(dto, userId);
   }
+  
+@Public()
+@Post('sepay-webhook')
+async sepayWebhook(
+  @Body() payload: any,
+  @Headers('x-sepay-signature') signature?: string,
+  // @Req() req: RawBodyRequest<Request>  // nếu cần raw body
+) {
+  const result = await this.paymentsService.handleSePayWebhook(payload, signature);
+  // SePay yêu cầu trả về { success: true }
+  return { ...result, success: true };
+}
 
+/**
+ * Lấy thông tin chuyển khoản của 1 đơn hàng
+ */
+@Public()
+@Get('bank-transfer/:orderId')
+async getBankTransferInfo(
+  @Param('orderId') orderId: string,
+  @ActiveUser('id') userId?: number,
+) {
+  const order = await this.paymentsService.getPaymentStatus(+orderId, userId);
+  return this.paymentsService.getBankTransferInfo(order);
+}
   /**
    * Callback từ cổng thanh toán (Return URL / IPN)
    * Ví dụ: /payments/callback?orderCode=ORDxxx&txnId=TXNxxx&status=success
