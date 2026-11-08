@@ -16,20 +16,25 @@ import { GetProductsDto } from './dto/get-products.dto.js';
 import { Public } from '../shared/decorators/public.decorator.js';
 import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
 import { RequirePermissions } from '../shared/decorators/permissions.decorator.js';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
 
+@ApiTags('Products')
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
+  @ApiBearerAuth('access-token')
   @Post()
   @UseGuards(PermissionsGuard)
-@RequirePermissions('product:create')
+  @RequirePermissions('product:create')
+  @ApiBearerAuth('access-token')
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
   }
 
   @Public()
   @Get()
+  @ApiOperation({ summary: 'Danh sách sản phẩm (có filter + phân trang)' })
   findAll(@Query() query: GetProductsDto) {
     return this.productsService.findAll(query);
   }

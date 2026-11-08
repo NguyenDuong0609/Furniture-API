@@ -2,9 +2,9 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
 const VariantSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).describe('Tên sản phẩm'),
   sku: z.string().optional(),
-  price: z.number().positive().optional(),
+  price: z.number().positive().optional().describe('Giá gốc'),
   stock: z.number().int().min(0).default(0),
   attributes: z.record(z.string(), z.string()).optional(), // { color: "Gray", material: "Oak" }
 });

@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: furniture-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: furniture
+      POSTGRES_PASSWORD: furniture123
+      POSTGRES_DB: furniture_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: furniture-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
+  app:
+    build: .
+    container_name: furniture-api
+    restart: always
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgresql://furniture:furniture123@postgres:5432/furniture_db?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NODE_ENV: production
+      JWT_SECRET: your-super-secret-jwt-key
+      JWT_REFRESH_SECRET: your-refresh-secret
+      API_KEY: your-api-key
+      # ... các biến khác
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,73 +1,72 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs';
-import * as path from 'path';
-import { randomUUID } from 'crypto';
+import { Injectable, BadRequestException, Inject } from '@nestjs/common';
+import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
+import { Readable } from 'stream';
 
 @Injectable()
 export class MediaService {
-  private readonly uploadPath: string;
-  private readonly baseUrl: string;
-
-  constructor(private readonly configService: ConfigService) {
-    this.uploadPath = path.join(process.cwd(), 'uploads');
-    this.baseUrl =
-      this.configService.get('APP_URL') || 'http://localhost:3000';
-  }
+  constructor(@Inject('CLOUDINARY') private cloudinaryConfig: any) {}
 
   async uploadFile(
     file: Express.Multer.File,
     folder: 'products' | 'avatars' = 'products',
-  ) {
+  ): Promise<{
+    url: string;
+    publicId: string;
+    width: number;
+    height: number;
+    format: string;
+    bytes: number;
+  }> {
     if (!file) {
       throw new BadRequestException('Không có file được upload');
     }
 
-    // Validate loại file
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException('Chỉ chấp nhận file ảnh (jpg, png, webp, gif)');
     }
 
-    // Validate kích thước (max 5MB)
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       throw new BadRequestException('File không được vượt quá 5MB');
     }
 
-    const folderPath = path.join(this.uploadPath, folder);
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath, { recursive: true });
-    }
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: `furniture/${folder}`,
+          resource_type: 'image',
+          transformation: [
+            { width: 1200, height: 1200, crop: 'limit' }, // giới hạn kích thước
+            { quality: 'auto' },
+            { fetch_format: 'auto' },
+          ],
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          if (!result) return reject(new Error('Upload failed'));
+          resolve({
+            url: result.secure_url,
+            publicId: result.public_id,
+            width: result.width,
+            height: result.height,
+            format: result.format,
+            bytes: result.bytes,
+          });
+        },
+      );
 
-    const ext = path.extname(file.originalname);
-    const filename = `${randomUUID()}${ext}`;
-    const filePath = path.join(folderPath, filename);
-
-    // Lưu file
-    fs.writeFileSync(filePath, file.buffer);
-
-    const url = `${this.baseUrl}/uploads/${folder}/${filename}`;
-
-    return {
-      url,
-      filename,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-    };
+      // Chuyển buffer thành stream
+      const stream = Readable.from(file.buffer);
+      stream.pipe(uploadStream);
+    });
   }
 
-  async deleteFile(fileUrl: string) {
+  async deleteFile(publicId: string) {
     try {
-      const relativePath = fileUrl.replace(this.baseUrl + '/', '');
-      const fullPath = path.join(process.cwd(), relativePath);
-
-      if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
-      }
+      await cloudinary.uploader.destroy(publicId);
     } catch (error) {
-      // bỏ qua lỗi xóa file
+      // bỏ qua lỗi
     }
   }
 }

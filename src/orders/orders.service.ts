@@ -1,7 +1,8 @@
-import {
+﻿import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
@@ -15,6 +16,8 @@ import { PaymentsService } from '../payments/payments.service.js';
 @Injectable()
 export class OrdersService {
   [x: string]: any;
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventsGateway: EventsGateway,
@@ -33,6 +36,7 @@ export class OrdersService {
    * Tạo đơn hàng từ giỏ hàng hiện tại
    */
   async create(dto: CreateOrderDto, userId?: number) {
+    try {
     // 1. Lấy cart
     let cart;
     if (userId) {
@@ -173,6 +177,7 @@ for (const item of cart.items) {
     });
 
     // Sau khi tạo order thành công:
+    this.eventsGateway.notifyNewOrder(order);
     this.eventsGateway.broadcast('newOrder', {
       orderId: order.id,
       orderCode: order.code,
@@ -188,24 +193,7 @@ for (const item of cart.items) {
       });
     }
 
-    // return {
-    //   message: 'Đặt hàng thành công',
-    //   order,
-    // };
-    // Websocket (đã có)
-this.eventsGateway.broadcast('newOrder', {
-  orderId: order.id,
-  orderCode: order.code,
-  totalAmount: order.totalAmount,
-  createdAt: order.createdAt,
-});
 
-if (userId) {
-  this.eventsGateway.sendToUser(userId, 'orderCreated', {
-    message: 'Đặt hàng thành công',
-    order,
-  });
-}
 
 // Queue nền (thêm)
 await this.orderQueueService.addSendOrderEmailJob({
@@ -221,11 +209,17 @@ await this.orderQueueService.addNotifyAdminJob({
   totalAmount: order.totalAmount.toNumber(),
 });
 
+this.logger.log({ orderCode: order.code }, 'Tạo đơn hàng thành công');
+
 return {
   message: 'Đặt hàng thành công',
   order,
   bankTransfer: this.paymentsService.getBankTransferInfo(order),
 };
+    } catch (err) {
+      this.logger.error({ err }, 'Lỗi khi tạo đơn hàng');
+      throw err;
+    }
   }
 
   /**

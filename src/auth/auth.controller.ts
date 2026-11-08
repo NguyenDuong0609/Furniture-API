@@ -12,7 +12,9 @@ import { Verify2FADto } from './dto/verify-2fa.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { Throttle } from '@nestjs/throttler';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
 
+@ApiTags('Auth')
 @Controller('auth')
 @UseGuards(JwtAuthGuard)
 export class AuthController {
@@ -20,6 +22,7 @@ export class AuthController {
 
   @Public()
   @Post('register')
+  @ApiOperation({ summary: 'Đăng ký tài khoản' })
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
@@ -27,6 +30,7 @@ export class AuthController {
   @Public()
   @Throttle({ short: { limit: 3, ttl: 60000 } }) // chỉ 3 lần / phút
   @Post('login')
+  @ApiOperation({ summary: 'Đăng nhập' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
@@ -103,8 +107,9 @@ disable2FA(
   //     user,
   //   };
   // }
-
-    @Get('profile')
+@ApiBearerAuth('access-token')
+  @Get('profile')
+  @ApiOperation({ summary: 'Lấy thông tin profile' })
   getProfile(@ActiveUser('id') userId: number) {
     return this.authService.getProfile(userId);
   }

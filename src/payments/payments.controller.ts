@@ -6,7 +6,9 @@ import {
   Query,
   Param,
   Headers,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { PaymentsService } from './payments.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
 import { ConfirmCodDto } from './dto/confirm-cod.dto.js';
@@ -36,6 +38,42 @@ export class PaymentsController {
   ) {
     return this.paymentsService.createPaymentUrl(dto, userId);
   }
+
+@Public()
+@Get('vnpay-return')
+async vnpayReturn(@Query() query: Record<string, string>) {
+  return this.paymentsService.verifyVNPayReturn(query);
+}
+
+@Public()
+@Post('create-vnpay')
+async createVNPay(
+  @Body('orderId') orderId: number,
+  @Req() req: any,
+  @ActiveUser('id') userId?: number,
+) {
+  const order = await this.paymentsService.getPaymentStatus(orderId, userId);
+  const ipAddr =
+    req.headers['x-forwarded-for'] ||
+    req.connection?.remoteAddress ||
+    '127.0.0.1';
+
+  const paymentUrl = this.paymentsService.createVNPayUrl(order, ipAddr);
+  return { paymentUrl };
+}
+
+
+@Public()
+@Post('create-momo')
+createMoMo(@Body('orderId') orderId: number) {
+  // lấy order rồi gọi createMoMoUrl
+}
+
+@Public()
+@Post('momo-ipn')
+momoIpn(@Body() body: Record<string, any>) {
+  // verify + cập nhật order
+}
   
 @Public()
 @Post('sepay-webhook')

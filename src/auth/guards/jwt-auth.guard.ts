@@ -1,4 +1,4 @@
-import { ExecutionContext, Injectable } from '@nestjs/common';
+﻿import { ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { Socket } from 'socket.io';
@@ -11,7 +11,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   canActivate(context: ExecutionContext) {
-    // Kiểm tra xem route có đánh dấu @Public() không
+    // WebSocket: đã xác thực trong handleConnection, không cần Passport guard
+    if (context.getType() === 'ws') {
+      return true;
+    }
+
+    // Kiểm tra route có @Public() không
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),

@@ -31,6 +31,9 @@ import { redisStore } from 'cache-manager-redis-yet';
 import { BullModule } from '@nestjs/bullmq';
 import { QueuesModule } from './queues/queues.module.js';
 import { createKeyv } from 'keyv';
+import { LoggerModule } from 'nestjs-pino';
+import { NotificationsModule } from './notifications/notifications.module.js';
+import { ChatModule } from './chat/chat.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -99,6 +102,23 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
         },
       }),
     }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty', options: { singleLine: true, colorize: true } }
+            : undefined,
+        level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
+        autoLogging: true,
+        serializers: {
+          req: (req) => ({
+            id: req.id,
+            method: req.method,
+            url: req.url,
+          }),
+        },
+      },
+    }),
     SharedModule,
     // PostsModule,
     AuthModule,
@@ -112,6 +132,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     MediaModule,
     EventsModule,
     QueuesModule,
+    NotificationsModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [

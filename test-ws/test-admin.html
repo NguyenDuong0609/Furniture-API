@@ -1,0 +1,229 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Test WebSocket — Admin</title>
+  <style>
+    * { box-sizing: border-box; font-family: monospace; }
+    body { margin: 0; display: flex; height: 100vh; background: #1e1e2e; color: #cdd6f4; }
+    .sidebar { width: 280px; background: #181825; padding: 16px; border-right: 1px solid #313244; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+    .main { flex: 1; display: flex; flex-direction: column; }
+    h2 { margin: 0 0 6px; font-size: 13px; color: #f38ba8; text-transform: uppercase; letter-spacing: 1px; }
+    input, textarea, select { width: 100%; padding: 7px 10px; background: #313244; border: 1px solid #45475a; border-radius: 6px; color: #cdd6f4; font-size: 13px; outline: none; }
+    button { width: 100%; padding: 8px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+    .btn-connect    { background: #a6e3a1; color: #1e1e2e; }
+    .btn-send       { background: #89b4fa; color: #1e1e2e; }
+    .btn-disconnect { background: #f38ba8; color: #1e1e2e; }
+    .btn-join       { background: #cba6f7; color: #1e1e2e; }
+    .btn-markread   { background: #f9e2af; color: #1e1e2e; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+    .badge-on  { background: #a6e3a1; color: #1e1e2e; }
+    .badge-off { background: #f38ba8; color: #1e1e2e; }
+    .log-area { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+    .log-item { padding: 8px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; word-break: break-all; }
+    .log-info  { background: #313244; border-left: 3px solid #89b4fa; }
+    .log-ok    { background: #1e3a2e; border-left: 3px solid #a6e3a1; }
+    .log-warn  { background: #3a2e1e; border-left: 3px solid #fab387; }
+    .log-error { background: #3a1e1e; border-left: 3px solid #f38ba8; }
+    .log-msg   { background: #2a2a3e; border-left: 3px solid #cba6f7; }
+    .log-notif { background: #2e2a1e; border-left: 3px solid #f9e2af; }
+    .log-order { background: #1e2a3a; border-left: 3px solid #74c7ec; }
+    .chat-box { padding: 12px; border-top: 1px solid #313244; display: flex; gap: 8px; }
+    .chat-box input { flex: 1; }
+    .chat-box button { width: auto; padding: 7px 18px; }
+    label { font-size: 12px; color: #6c7086; margin-bottom: 2px; display: block; }
+    .status-bar { padding: 8px 16px; background: #181825; border-bottom: 1px solid #313244; font-size: 12px; display: flex; align-items: center; gap: 10px; }
+    hr { border: none; border-top: 1px solid #313244; margin: 4px 0; }
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>👨‍💼 Admin Panel</h2>
+
+  <div>
+    <label>Server URL</label>
+    <input id="serverUrl" value="http://localhost:3000/ws">
+  </div>
+
+  <div>
+    <label>Access Token (Admin JWT)</label>
+    <textarea id="token" rows="4" placeholder="Paste accessToken của Admin..."></textarea>
+  </div>
+
+  <button class="btn-connect" onclick="connect()">⚡ Kết nối</button>
+  <button class="btn-disconnect" onclick="disconnect()">✕ Ngắt kết nối</button>
+
+  <hr>
+  <h2>💬 Chat với User</h2>
+
+  <div>
+    <label>userId của user cần reply</label>
+    <input id="targetUserId" type="number" placeholder="VD: 5">
+  </div>
+
+  <button class="btn-join" onclick="joinConversation()">🔗 Join conversation</button>
+
+  <div>
+    <label>Nội dung reply</label>
+    <input id="replyContent" placeholder="Nhập nội dung...">
+  </div>
+
+  <button class="btn-send" onclick="replyUser()">➤ Reply User</button>
+
+  <hr>
+  <h2>✅ Đánh dấu đã đọc</h2>
+  <div>
+    <label>messageIds (cách nhau dấu phẩy)</label>
+    <input id="messageIds" placeholder="VD: 1,2,3">
+  </div>
+  <button class="btn-markread" onclick="markRead()">✔ Mark as Read</button>
+
+  <hr>
+  <h2>ℹ️ Events nhận được</h2>
+  <div style="font-size:12px;color:#6c7086;line-height:2">
+    <div>🔔 <b style="color:#f9e2af">notification</b> — mọi notification</div>
+    <div>💬 <b style="color:#cba6f7">newMessage</b> — tin nhắn từ user</div>
+    <div>📦 <b style="color:#74c7ec">newOrder</b> — đơn hàng mới</div>
+    <div>💰 <b style="color:#74c7ec">orderPaid</b> — đơn đã thanh toán</div>
+    <div>✔ <b style="color:#a6e3a1">joinedConversation</b> — ack join</div>
+    <div>✔ <b style="color:#a6e3a1">markedAsRead</b> — ack mark read</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="status-bar">
+    <span>Trạng thái:</span>
+    <span id="statusBadge" class="badge badge-off">Chưa kết nối</span>
+    <span id="socketId" style="color:#6c7086"></span>
+    <span id="roomInfo" style="color:#cba6f7; margin-left: auto"></span>
+  </div>
+
+  <div class="log-area" id="logArea"></div>
+
+  <div class="chat-box">
+    <input id="quickReply" placeholder="Reply nhanh cho user (cần Join conversation trước)..." onkeydown="if(event.key==='Enter') replyUser()">
+    <button class="btn-send" onclick="replyUser()">Reply</button>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  let socket = null;
+  let joinedUserId = null;
+
+  function log(text, type = 'info') {
+    const area = document.getElementById('logArea');
+    const div = document.createElement('div');
+    div.className = `log-item log-${type}`;
+    const time = new Date().toLocaleTimeString('vi-VN');
+    div.textContent = `[${time}] ${text}`;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function setStatus(on, id = '') {
+    const badge = document.getElementById('statusBadge');
+    badge.textContent = on ? 'Đã kết nối (Admin)' : 'Chưa kết nối';
+    badge.className = 'badge ' + (on ? 'badge-on' : 'badge-off');
+    document.getElementById('socketId').textContent = id ? `socket: ${id}` : '';
+  }
+
+  function connect() {
+    if (socket) socket.disconnect();
+    const url   = document.getElementById('serverUrl').value.trim();
+    const token = document.getElementById('token').value.trim();
+    if (!token) { log('⚠ Chưa nhập token!', 'warn'); return; }
+
+    log(`Đang kết nối Admin tới ${url} ...`, 'info');
+    socket = io(url, { auth: { token } });
+
+    socket.on('connect', () => {
+      setStatus(true, socket.id);
+      log(`✅ Admin kết nối thành công — socket.id: ${socket.id}`, 'ok');
+      log('ℹ️  Đã tự động vào phòng "admins" (do JWT có role ADMIN)', 'info');
+    });
+
+    socket.on('disconnect', (reason) => {
+      setStatus(false);
+      joinedUserId = null;
+      document.getElementById('roomInfo').textContent = '';
+      log(`❌ Ngắt kết nối: ${reason}`, 'error');
+    });
+
+    socket.on('connect_error', (err) => {
+      setStatus(false);
+      log(`⛔ Lỗi kết nối: ${err.message}`, 'error');
+    });
+
+    // ---- Notification ----
+    socket.on('notification', (data) => {
+      log(`🔔 NOTIFICATION | type: ${data.type || '?'} | ${data.title || ''}: ${data.message || ''}`, 'notif');
+      log(`   → full: ${JSON.stringify(data)}`, 'notif');
+    });
+
+    // ---- Chat ----
+    socket.on('newMessage', (msg) => {
+      const from = msg.isAdmin ? '👨‍💼 Admin (bạn/admin khác)' : `👤 User #${msg.fromUserId}`;
+      log(`💬 newMessage từ ${from}: "${msg.content}"`, 'msg');
+    });
+
+    // ---- Orders ----
+    socket.on('newOrder', (d) => {
+      log(`📦 newOrder | orderId: ${d.orderId} | code: ${d.orderCode} | amount: ${d.totalAmount}`, 'order');
+    });
+
+    socket.on('orderPaid', (d) => {
+      log(`💰 orderPaid | code: ${d.orderCode || JSON.stringify(d)}`, 'order');
+    });
+
+    // ---- Ack ----
+    socket.on('joinedConversation', (d) => {
+      log(`✔ joinedConversation: ${JSON.stringify(d)}`, 'ok');
+    });
+
+    socket.on('markedAsRead', (d) => {
+      log(`✔ markedAsRead: messageIds=${JSON.stringify(d.messageIds)}`, 'ok');
+    });
+
+    socket.on('messageSent', (d) => {
+      log(`✔ messageSent ack: ${JSON.stringify(d)}`, 'ok');
+    });
+  }
+
+  function disconnect() {
+    if (socket) { socket.disconnect(); socket = null; }
+  }
+
+  function joinConversation() {
+    if (!socket?.connected) { log('⚠ Chưa kết nối!', 'warn'); return; }
+    const userId = parseInt(document.getElementById('targetUserId').value);
+    if (!userId) { log('⚠ Chưa nhập userId!', 'warn'); return; }
+    socket.emit('joinConversation', { userId });
+    joinedUserId = userId;
+    document.getElementById('roomInfo').textContent = `Đang chat với user #${userId}`;
+    log(`🔗 Đã emit joinConversation → userId: ${userId}`, 'info');
+  }
+
+  function replyUser() {
+    if (!socket?.connected) { log('⚠ Chưa kết nối!', 'warn'); return; }
+    const content = document.getElementById('quickReply').value || document.getElementById('replyContent').value;
+    if (!content.trim()) { log('⚠ Nội dung trống!', 'warn'); return; }
+    const toUserId = parseInt(document.getElementById('targetUserId').value) || joinedUserId || undefined;
+    socket.emit('sendMessage', { toUserId, content: content.trim() });
+    document.getElementById('quickReply').value = '';
+    document.getElementById('replyContent').value = '';
+    log(`➤ Admin gửi tới user #${toUserId}: "${content.trim()}"`, 'info');
+  }
+
+  function markRead() {
+    if (!socket?.connected) { log('⚠ Chưa kết nối!', 'warn'); return; }
+    const raw = document.getElementById('messageIds').value;
+    const ids = raw.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    if (!ids.length) { log('⚠ Chưa nhập messageIds!', 'warn'); return; }
+    socket.emit('markAsRead', { messageIds: ids });
+    log(`✔ Đã emit markAsRead: [${ids.join(', ')}]`, 'info');
+  }
+</script>
+</body>
+</html>

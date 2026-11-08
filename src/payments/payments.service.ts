@@ -7,6 +7,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
 import { randomBytes } from 'crypto';
 import { EventsGateway } from '../events/events.gateway.js';
+import * as crypto from 'crypto';
+import * as qs from 'qs';
 
 @Injectable()
 export class PaymentsService {
@@ -81,6 +83,207 @@ export class PaymentsService {
     };
   }
 
+/**
+ * Tạo URL thanh toán VNPay
+ */
+createVNPayUrl(order: { code: string; totalAmount: any }, ipAddr: string) {
+  const tmnCode = process.env.VNP_TMN_CODE!;
+  const secretKey = process.env.VNP_HASH_SECRET!;
+  const returnUrl = process.env.VNP_RETURN_URL!;
+  const vnpUrl = process.env.VNP_URL!;
+
+  const date = new Date();
+  const createDate = this.formatDate(date);
+  const amount = Math.round(Number(order.totalAmount) * 100); // VNPay tính theo xu
+
+  let vnpParams: Record<string, string | number> = {
+    vnp_Version: '2.1.0',
+    vnp_Command: 'pay',
+    vnp_TmnCode: tmnCode,
+    vnp_Locale: 'vn',
+    vnp_CurrCode: 'VND',
+    vnp_TxnRef: order.code,
+    vnp_OrderInfo: `Thanh toan don hang ${order.code}`,
+    vnp_OrderType: 'other',
+    vnp_Amount: amount,
+    vnp_ReturnUrl: returnUrl,
+    vnp_IpAddr: ipAddr,
+    vnp_CreateDate: createDate,
+  };
+
+  vnpParams = this.sortObject(vnpParams);
+  const signData = qs.stringify(vnpParams, { encode: false });
+  const hmac = crypto.createHmac('sha512', secretKey);
+  const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+  vnpParams['vnp_SecureHash'] = signed;
+
+  return vnpUrl + '?' + qs.stringify(vnpParams, { encode: false });
+}
+
+/**
+ * Verify và xử lý kết quả trả về từ VNPay
+ */
+async verifyVNPayReturn(query: Record<string, string>) {
+  const secretKey = process.env.VNP_HASH_SECRET!;
+  const secureHash = query['vnp_SecureHash'];
+
+  // Tạo bản copy để sort và ký lại
+  const vnpParams = { ...query };
+  delete vnpParams['vnp_SecureHash'];
+  delete vnpParams['vnp_SecureHashType'];
+
+  const sorted = this.sortObject(vnpParams);
+  const signData = qs.stringify(sorted, { encode: false });
+  const hmac = crypto.createHmac('sha512', secretKey);
+  const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+
+  // 1. Kiểm tra chữ ký
+  if (secureHash !== signed) {
+    return {
+      success: false,
+      message: 'Chữ ký không hợp lệ',
+      code: 'INVALID_SIGNATURE',
+    };
+  }
+
+  const orderCode = query['vnp_TxnRef'];
+  const responseCode = query['vnp_ResponseCode'];
+  const amount = Number(query['vnp_Amount']) / 100;
+  const transactionNo = query['vnp_TransactionNo'];
+
+  const order = await this.prisma.order.findUnique({
+    where: { code: orderCode },
+  });
+
+  if (!order) {
+    return {
+      success: false,
+      message: 'Không tìm thấy đơn hàng',
+      code: 'ORDER_NOT_FOUND',
+    };
+  }
+
+  // 2. Kiểm tra số tiền
+  if (Number(order.totalAmount) !== amount) {
+    return {
+      success: false,
+      message: 'Số tiền không khớp',
+      code: 'INVALID_AMOUNT',
+    };
+  }
+
+  // 3. Đã thanh toán rồi thì thôi
+  if (order.paymentStatus === 'PAID') {
+    return {
+      success: true,
+      message: 'Đơn hàng đã được thanh toán trước đó',
+      orderCode,
+      code: 'ALREADY_PAID',
+    };
+  }
+
+  // 4. ResponseCode = 00 → thành công
+  if (responseCode === '00') {
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        paymentStatus: 'PAID',
+        status: 'CONFIRMED',
+        paymentMethod: 'VNPAY',
+      },
+    });
+
+    // Gửi notification realtime
+    this.eventsGateway.notifyOrderPaid(order);
+
+    return {
+      success: true,
+      message: 'Thanh toán thành công',
+      orderCode,
+      transactionNo,
+      code: 'SUCCESS',
+    };
+  }
+
+  // Thất bại
+  await this.prisma.order.update({
+    where: { id: order.id },
+    data: { paymentStatus: 'FAILED' },
+  });
+
+  return {
+    success: false,
+    message: 'Thanh toán thất bại',
+    orderCode,
+    responseCode,
+    code: 'FAILED',
+  };
+}
+
+private sortObject(obj: Record<string, any>) {
+  const sorted: Record<string, any> = {};
+  Object.keys(obj)
+    .sort()
+    .forEach((key) => {
+      sorted[key] = obj[key];
+    });
+  return sorted;
+}
+
+private formatDate(date: Date) {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return (
+    date.getFullYear().toString() +
+    pad(date.getMonth() + 1) +
+    pad(date.getDate()) +
+    pad(date.getHours()) +
+    pad(date.getMinutes()) +
+    pad(date.getSeconds())
+  );
+}
+
+// ===== MoMo =====
+async createMoMoUrl(order: { code: string; totalAmount: any }) {
+  const partnerCode = process.env.MOMO_PARTNER_CODE;
+  const accessKey = process.env.MOMO_ACCESS_KEY;
+  const secretKey = process.env.MOMO_SECRET_KEY;
+  const requestId = order.code + '_' + Date.now();
+  const orderId = order.code;
+  const orderInfo = `Thanh toan don hang ${order.code}`;
+  const amount = String(Number(order.totalAmount));
+  const redirectUrl = process.env.MOMO_RETURN_URL || 'http://localhost:3000/payments/momo-return';
+  const ipnUrl = process.env.MOMO_IPN_URL || 'http://localhost:3000/payments/momo-ipn';
+  const requestType = 'captureWallet';
+  const extraData = '';
+
+  const rawSignature = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${redirectUrl}&requestId=${requestId}&requestType=${requestType}`;
+  const signature = crypto.createHmac('sha256', secretKey || '').update(rawSignature).digest('hex');
+
+  const body = {
+    partnerCode,
+    accessKey,
+    requestId,
+    amount,
+    orderId,
+    orderInfo,
+    redirectUrl,
+    ipnUrl,
+    extraData,
+    requestType,
+    signature,
+    lang: 'vi',
+  };
+
+  const response = await fetch(process.env.MOMO_ENDPOINT || '', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json();
+  return result.payUrl;
+}
+
   /**
  * Xử lý Webhook từ SePay khi có tiền vào
  */
@@ -148,6 +351,7 @@ async handleSePayWebhook(payload: any, signature?: string, rawBody?: string) {
   });
 
   // Gửi thông báo realtime
+  this.eventsGateway.notifyOrderPaid(order);
   if (order.userId) {
     // Nếu có userId, gửi notification cho user
     this.eventsGateway.sendToUser(order.userId, 'orderPaid', { orderCode });
