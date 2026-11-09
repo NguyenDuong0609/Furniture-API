@@ -176,7 +176,13 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async notifyOrderPaid(order: any) {
     const orderData = { orderId: order.id, orderCode: order.code };
 
-    // Notification cho user (nếu có)
+    // Emit event orderPaid trực tiếp để frontend/Postman nhận được ngay
+    if (order.userId) {
+      this.server.to(`user_${order.userId}`).emit('orderPaid', orderData);
+    }
+    this.server.to('admins').emit('orderPaid', { ...orderData, isGuest: !order.userId });
+
+    // Lưu Notification vào DB + emit notification badge cho user
     if (order.userId) {
       const noti = await this.notificationsService.create(
         order.userId,
@@ -188,7 +194,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.sendNotification(order.userId, noti);
     }
 
-    // Notification cho tất cả admin
+    // Lưu Notification cho tất cả admin
     const adminNotis = await this.notificationsService.createForAdmins(
       'ORDER_PAID' as any,
       'Đơn hàng đã thanh toán',
@@ -199,7 +205,6 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.sendNotification(noti.userId, noti);
     });
   }
-
   // ========== CHAT ==========
 
   /**

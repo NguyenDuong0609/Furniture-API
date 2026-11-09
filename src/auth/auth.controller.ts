@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards, Patch } from '@nestjs/common';
+﻿import { Body, Controller, Get, Post, Req, UseGuards, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
@@ -13,14 +13,16 @@ import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
+import { ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from './dto/forgot-password.dto.js';
 
 @ApiTags('Auth')
 @Controller('auth')
 @UseGuards(JwtAuthGuard)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('register')
   @ApiOperation({ summary: 'Đăng ký tài khoản' })
   register(@Body() registerDto: RegisterDto) {
@@ -28,49 +30,73 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ short: { limit: 3, ttl: 60000 } }) // chỉ 3 lần / phút
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @ApiOperation({ summary: 'Đăng nhập' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
 
-@Patch('profile')
-updateProfile(
-  @ActiveUser('id') userId: number,
-  @Body() dto: UpdateProfileDto,
-) {
-  return this.authService.updateProfile(userId, dto);
-}
+  @Patch('profile')
+  updateProfile(
+    @ActiveUser('id') userId: number,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(userId, dto);
+  }
 
-@Post('change-password')
-changePassword(
-  @ActiveUser('id') userId: number,
-  @Body() dto: ChangePasswordDto,
-) {
-  return this.authService.changePassword(userId, dto);
-}
+  @Post('change-password')
+  changePassword(
+    @ActiveUser('id') userId: number,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Public()
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
+  }
+
+  @Public()
+  @Post('verify-email')
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @Post('send-verify-email')
+  sendVerifyEmail(@ActiveUser('id') userId: number) {
+    return this.authService.sendVerifyEmail(userId);
+  }
 
   @Post('2fa/generate')
-generate2FA(@ActiveUser('id') userId: number) {
-  return this.authService.generateTwoFactorSecret(userId);
-}
+  generate2FA(@ActiveUser('id') userId: number) {
+    return this.authService.generateTwoFactorSecret(userId);
+  }
 
-@Post('2fa/enable')
-enable2FA(
-  @ActiveUser('id') userId: number,
-  @Body() dto: Verify2FADto,
-) {
-  return this.authService.enableTwoFactor(userId, dto.token);
-}
+  @Post('2fa/enable')
+  enable2FA(
+    @ActiveUser('id') userId: number,
+    @Body() dto: Verify2FADto,
+  ) {
+    return this.authService.enableTwoFactor(userId, dto.token);
+  }
 
-@Post('2fa/disable')
-disable2FA(
-  @ActiveUser('id') userId: number,
-  @Body() dto: Verify2FADto,
-) {
-  return this.authService.disableTwoFactor(userId, dto.token);
-}
+  @Post('2fa/disable')
+  disable2FA(
+    @ActiveUser('id') userId: number,
+    @Body() dto: Verify2FADto,
+  ) {
+    return this.authService.disableTwoFactor(userId, dto.token);
+  }
 
   @Public()
   @Post('logout')
@@ -107,7 +133,7 @@ disable2FA(
   //     user,
   //   };
   // }
-@ApiBearerAuth('access-token')
+  @ApiBearerAuth('access-token')
   @Get('profile')
   @ApiOperation({ summary: 'Lấy thông tin profile' })
   getProfile(@ActiveUser('id') userId: number) {

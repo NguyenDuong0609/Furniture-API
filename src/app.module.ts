@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -34,6 +34,12 @@ import { createKeyv } from 'keyv';
 import { LoggerModule } from 'nestjs-pino';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { ChatModule } from './chat/chat.module.js';
+import { BrandsModule } from './brands/brands.module.js';
+import { WishlistsModule } from './wishlists/wishlists.module.js';
+import { ReviewsModule } from './reviews/reviews.module.js';
+import { AddressesModule } from './addresses/addresses.module.js';
+import { HealthController } from './health/health.controller.js';
+import { CouponsModule } from './coupons/coupons.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -64,19 +70,14 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
     ThrottlerModule.forRoot([
       {
-        name: 'short',
-        ttl: 1000,   // 1 giây
-        limit: 5,    // tối đa 5 request / giây
+        name: 'default',
+        ttl: Number(process.env.THROTTLE_TTL_MS) || 60_000,
+        limit: Number(process.env.THROTTLE_LIMIT) || 100,
       },
       {
-        name: 'medium',
-        ttl: 10000,  // 10 giây
-        limit: 20,
-      },
-      {
-        name: 'long',
-        ttl: 60000,  // 1 phút
-        limit: 100,
+        name: 'login',
+        ttl: 60_000,
+        limit: Number(process.env.LOGIN_THROTTLE_LIMIT) || 5,
       },
     ]),
     CacheModule.registerAsync({
@@ -84,13 +85,16 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => {
-        const keyv = new Keyv(
-          new KeyvRedis(config.get<string>('REDIS_URL', 'redis://localhost:6379')),
-        );
-        return {
-          stores: [keyv],
-          ttl: 60_000, // ms — TTL mặc định
-        };
+        if (process.env.REDIS_URL) {
+          const keyv = new Keyv(
+            new KeyvRedis(config.get<string>('REDIS_URL', 'redis://localhost:6379')),
+          );
+          return {
+            stores: [keyv],
+            ttl: 60_000, // ms — TTL mặc định
+          };
+        }// Dev không Redis vẫn chạy
+        return { ttl: 60_000 };
       },
     }),
     BullModule.forRootAsync({
@@ -134,8 +138,13 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     QueuesModule,
     NotificationsModule,
     ChatModule,
+    BrandsModule,
+    WishlistsModule,
+    ReviewsModule,
+    AddressesModule,
+    CouponsModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [
     AppService,
     {
@@ -144,4 +153,4 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

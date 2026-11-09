@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -7,29 +7,26 @@ import {
   Param,
   Headers,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { PaymentsService } from './payments.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
 import { ConfirmCodDto } from './dto/confirm-cod.dto.js';
 import { Public } from '../shared/decorators/public.decorator.js';
 import { ActiveUser } from '../shared/decorators/active-user.decorator.js';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(private readonly paymentsService: PaymentsService) { }
 
-  /**
-   * Admin xác nhận COD đã thu tiền
-   */
+  /** Admin xác nhận COD đã thu tiền */
   @Post('confirm-cod')
   confirmCod(@Body() dto: ConfirmCodDto) {
     return this.paymentsService.confirmCod(dto.orderId);
   }
 
-  /**
-   * Tạo link thanh toán online (mô phỏng)
-   */
+  /** Tạo link thanh toán online (mô phỏng) */
   @Public()
   @Post('create')
   createPayment(
@@ -39,70 +36,75 @@ export class PaymentsController {
     return this.paymentsService.createPaymentUrl(dto, userId);
   }
 
-@Public()
-@Get('vnpay-return')
-async vnpayReturn(@Query() query: Record<string, string>) {
-  return this.paymentsService.verifyVNPayReturn(query);
-}
+  /** VNPay return URL */
+  @Public()
+  @Get('vnpay-return')
+  async vnpayReturn(@Query() query: Record<string, string>) {
+    return this.paymentsService.verifyVNPayReturn(query);
+  }
 
-@Public()
-@Post('create-vnpay')
-async createVNPay(
-  @Body('orderId') orderId: number,
-  @Req() req: any,
-  @ActiveUser('id') userId?: number,
-) {
-  const order = await this.paymentsService.getPaymentStatus(orderId, userId);
-  const ipAddr =
-    req.headers['x-forwarded-for'] ||
-    req.connection?.remoteAddress ||
-    '127.0.0.1';
+  /** Tạo URL thanh toán VNPay */
+  @Public()
+  @Post('create-vnpay')
+  async createVNPay(
+    @Body('orderId') orderId: number,
+    @Req() req: any,
+    @ActiveUser('id') userId?: number,
+  ) {
+    const order = await this.paymentsService.getPaymentStatus(orderId, userId);
+    const ipAddr =
+      req.headers['x-forwarded-for'] ||
+      req.connection?.remoteAddress ||
+      '127.0.0.1';
+    const paymentUrl = this.paymentsService.createVNPayUrl(order, ipAddr);
+    return { paymentUrl };
+  }
 
-  const paymentUrl = this.paymentsService.createVNPayUrl(order, ipAddr);
-  return { paymentUrl };
-}
+  /** SePay webhook — nhận callback khi có tiền vào */
+  @Public()
+  @SkipThrottle()
+  @Post('sepay-webhook')
+  async sepayWebhook(
+    @Body() payload: any,
+    @Headers() headers: Record<string, string>,
+    @Req() req: any,
+  ) {
+    const rawBody = req.rawBody?.toString?.() || JSON.stringify(payload);
+    return this.paymentsService.handleSePayWebhook(payload, headers, rawBody);
+  }
 
-
-@Public()
-@Post('create-momo')
-createMoMo(@Body('orderId') orderId: number) {
-  // lấy order rồi gọi createMoMoUrl
-}
-
-@Public()
-@Post('momo-ipn')
-momoIpn(@Body() body: Record<string, any>) {
-  // verify + cập nhật order
-}
-  
-@Public()
-@Post('sepay-webhook')
-async sepayWebhook(
-  @Body() payload: any,
-  @Headers('x-sepay-signature') signature?: string,
-  // @Req() req: RawBodyRequest<Request>  // nếu cần raw body
-) {
-  const result = await this.paymentsService.handleSePayWebhook(payload, signature);
-  // SePay yêu cầu trả về { success: true }
-  return { ...result, success: true };
-}
-
-/**
- * Lấy thông tin chuyển khoản của 1 đơn hàng
- */
-@Public()
-@Get('bank-transfer/:orderId')
-async getBankTransferInfo(
-  @Param('orderId') orderId: string,
-  @ActiveUser('id') userId?: number,
-) {
-  const order = await this.paymentsService.getPaymentStatus(+orderId, userId);
-  return this.paymentsService.getBankTransferInfo(order);
-}
   /**
-   * Callback từ cổng thanh toán (Return URL / IPN)
-   * Ví dụ: /payments/callback?orderCode=ORDxxx&txnId=TXNxxx&status=success
+   * CHỈ DÙNG KHI TEST – giả lập SePay chuyển khoản thành công
+   * POST /payments/simulate-sepay
+   * body: { "orderId": 1, "success": true }
+   * body: { "orderId": 1, "amount": 1000 }  → thiếu tiền
    */
+  @Public()
+  @Post('simulate-sepay')
+  async simulateSePay(
+    @Body() body: { orderId: number; success?: boolean; amount?: number },
+  ) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException('Simulate chỉ dùng ở môi trường dev/test');
+    }
+    return this.paymentsService.simulateSePayPayment(body.orderId, {
+      success: body.success,
+      amount: body.amount,
+    });
+  }
+
+  /** Lấy thông tin chuyển khoản (QR + số tài khoản) */
+  @Public()
+  @Get('bank-transfer/:orderId')
+  async getBankTransferInfo(
+    @Param('orderId') orderId: string,
+    @ActiveUser('id') userId?: number,
+  ) {
+    const order = await this.paymentsService.getPaymentStatus(+orderId, userId);
+    return this.paymentsService.getBankTransferInfo(order);
+  }
+
+  /** Callback từ cổng thanh toán (IPN / Return URL) */
   @Public()
   @Get('callback')
   handleCallback(
@@ -119,9 +121,7 @@ async getBankTransferInfo(
     });
   }
 
-  /**
-   * Kiểm tra trạng thái thanh toán
-   */
+  /** Kiểm tra trạng thái thanh toán */
   @Public()
   @Get('status/:orderId')
   getStatus(

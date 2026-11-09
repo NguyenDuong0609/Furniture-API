@@ -1,23 +1,39 @@
-# Build stage
-FROM node:22-alpine AS builder
+# ===== Base =====
+FROM node:20-alpine AS base
 WORKDIR /app
+RUN apk add --no-cache libc6-compat openssl
+
+# ===== Dependencies =====
+FROM base AS deps
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+COPY prisma ./prisma/
+RUN npm ci
+RUN npx prisma generate
+
+# ===== Development =====
+FROM base AS development
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npx prisma generate
+EXPOSE 3000
+CMD ["npm", "run", "start:dev"]
+
+# ===== Build =====
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-# Production stage
-FROM node:22-alpine
+# ===== Production =====
+FROM base AS production
 WORKDIR /app
+ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/uploads ./uploads
-
-ENV NODE_ENV=production
 EXPOSE 3000
-
-# Sync database and seed on startup
-CMD ["sh", "-c", "npx prisma db push --url=$DATABASE_URL && DATABASE_URL=$DATABASE_URL npx tsx prisma/seed.ts && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]

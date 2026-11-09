@@ -21,7 +21,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
 @ApiTags('Products')
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) { }
 
   @ApiBearerAuth('access-token')
   @Post()
@@ -40,6 +40,12 @@ export class ProductsController {
   }
 
   @Public()
+  @Get(':id/related')
+  related(@Param('id') id: string) {
+    return this.productsService.findRelated(+id);
+  }
+
+  @Public()
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(+id);
@@ -53,7 +59,7 @@ export class ProductsController {
 
   @Patch(':id')
   @UseGuards(PermissionsGuard)
-@RequirePermissions('product:update')
+  @RequirePermissions('product:update')
   update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
@@ -63,7 +69,7 @@ export class ProductsController {
 
   @Delete(':id')
   @UseGuards(PermissionsGuard)
-@RequirePermissions('product:delete')
+  @RequirePermissions('product:delete')
   remove(@Param('id') id: string) {
     return this.productsService.remove(+id);
   }

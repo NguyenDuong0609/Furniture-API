@@ -1,0 +1,134 @@
+version: "3.8"
+
+services:
+  # ==================== POSTGRESQL ====================
+  postgres:
+    image: postgres:16-alpine
+    container_name: furniture-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-furniture}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-furniture_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - furniture-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-furniture} -d ${POSTGRES_DB:-furniture_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Không expose port ra ngoài nếu chỉ app trong docker cần dùng
+    # ports:
+    #   - "5432:5432"
+
+  # ==================== REDIS ====================
+  redis:
+    image: redis:7-alpine
+    container_name: furniture-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    networks:
+      - furniture-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # ports:
+    #   - "6379:6379"
+
+  # ==================== NESTJS APP ====================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: furniture-api
+    restart: always
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-furniture}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-furniture_db}?schema=public
+
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+
+      # App
+      APP_URL: ${APP_URL:-https://api.yourdomain.com}
+
+      # Cloudinary
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+
+      # SePay
+      SEPAY_API_TOKEN: ${SEPAY_API_TOKEN}
+      SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET}
+      SEPAY_BANK_ACCOUNT: ${SEPAY_BANK_ACCOUNT}
+      SEPAY_ACCOUNT_NAME: ${SEPAY_ACCOUNT_NAME}
+
+      # VNPay
+      VNP_TMN_CODE: ${VNP_TMN_CODE}
+      VNP_HASH_SECRET: ${VNP_HASH_SECRET}
+      VNP_URL: ${VNP_URL}
+      VNP_RETURN_URL: ${VNP_RETURN_URL}
+
+      # MoMo
+      MOMO_PARTNER_CODE: ${MOMO_PARTNER_CODE}
+      MOMO_ACCESS_KEY: ${MOMO_ACCESS_KEY}
+      MOMO_SECRET_KEY: ${MOMO_SECRET_KEY}
+      MOMO_ENDPOINT: ${MOMO_ENDPOINT}
+      MOMO_RETURN_URL: ${MOMO_RETURN_URL}
+      MOMO_IPN_URL: ${MOMO_IPN_URL}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - furniture-network
+    # Nếu vẫn lưu file local (không khuyến khích khi đã dùng Cloudinary)
+    # volumes:
+    #   - uploads_data:/app/uploads
+
+  # ==================== NGINX (tùy chọn) ====================
+  # Uncomment nếu muốn chạy Nginx trong cùng stack
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: furniture-nginx
+  #   restart: always
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/conf.d:/etc/nginx/conf.d
+  #     - ./certbot/conf:/etc/letsencrypt
+  #     - ./certbot/www:/var/www/certbot
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - furniture-network
+
+networks:
+  furniture-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  # uploads_data:

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+﻿import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -15,16 +15,19 @@ import * as QRCode from 'qrcode';
 import { I18nContext, I18nService } from 'nestjs-i18n';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly hashingService: HashingService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly i18n: I18nService,
-  ) {}
+  ) { }
 
   async register(registerDto: RegisterDto) {
     const { email, password, name } = registerDto;
@@ -80,62 +83,62 @@ export class AuthService {
   // }
 
   async login(loginDto: LoginDto | any) {  // tạm thời any, sau dùng Login2FADto
-  const { email, password, token } = loginDto;
+    const { email, password, token } = loginDto;
 
-  const user = await this.prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    // throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
-    // test i18n
-    throw new UnauthorizedException(this.i18n.t('common.auth.invalid_credentials'),);
-  }
-
-  const isPasswordValid = await this.hashingService.compare(password, user.password);
-  if (!isPasswordValid) {
-    throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
-  }
-
-  // Nếu user đã bật 2FA
-  if (user.isTwoFactorEnabled) {
-    if (!token) {
-      // Trả về yêu cầu nhập mã 2FA (chưa cấp token)
-      return {
-        message: 'Yêu cầu mã xác thực 2 lớp',
-        requires2FA: true,
-        // không trả accessToken
-      };
-    }
-
-    if (!user.twoFactorSecret) {
-      throw new UnauthorizedException('Chưa cấu hình mã xác thực 2FA');
-    }
-
-    const result = await verify({
-      token,
-      secret: user.twoFactorSecret,
-    });
-
-    if (!result.valid) {
-      // throw new UnauthorizedException('Mã 2FA không đúng');
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
       // test i18n
-      throw new UnauthorizedException(this.i18n.t('common.auth.invalid_2fa'),);
+      throw new UnauthorizedException(this.i18n.t('common.auth.invalid_credentials'),);
     }
+
+    const isPasswordValid = await this.hashingService.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
+
+    // Nếu user đã bật 2FA
+    if (user.isTwoFactorEnabled) {
+      if (!token) {
+        // Trả về yêu cầu nhập mã 2FA (chưa cấp token)
+        return {
+          message: 'Yêu cầu mã xác thực 2 lớp',
+          requires2FA: true,
+          // không trả accessToken
+        };
+      }
+
+      if (!user.twoFactorSecret) {
+        throw new UnauthorizedException('Chưa cấu hình mã xác thực 2FA');
+      }
+
+      const result = await verify({
+        token,
+        secret: user.twoFactorSecret,
+      });
+
+      if (!result.valid) {
+        // throw new UnauthorizedException('Mã 2FA không đúng');
+        // test i18n
+        throw new UnauthorizedException(this.i18n.t('common.auth.invalid_2fa'),);
+      }
+    }
+
+    // Tạo token bình thường
+    const tokens = await this.generateTokens(user.id, user.email);
+
+    // return {
+    //   message: 'Đăng nhập thành công',
+    //   ...tokens,
+    //   user: new UserEntity(user),
+    // };
+    // test i18n
+    return {
+      message: this.i18n.t('common.auth.login_success'),
+      ...tokens,
+      user: new UserEntity(user),
+    };
   }
-
-  // Tạo token bình thường
-  const tokens = await this.generateTokens(user.id, user.email);
-
-  // return {
-  //   message: 'Đăng nhập thành công',
-  //   ...tokens,
-  //   user: new UserEntity(user),
-  // };
-  // test i18n
-  return {
-    message: this.i18n.t('common.auth.login_success'),
-    ...tokens,
-    user: new UserEntity(user),
-  };
-}
 
   async logout(logoutDto: LogoutDto) {
     const { refreshToken } = logoutDto;
@@ -230,177 +233,267 @@ export class AuthService {
   /**
  * Tạo secret + QR code để user bật 2FA
  */
-async generateTwoFactorSecret(userId: number) {
-  const user = await this.prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new UnauthorizedException();
+  async generateTwoFactorSecret(userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
 
-  const secret = generateSecret();
-  const otpauthUrl = generateURI({
-    label: user.email,
-    issuer: 'NestJS Furniture Shop',
-    secret,
-  });
+    const secret = generateSecret();
+    const otpauthUrl = generateURI({
+      label: user.email,
+      issuer: 'NestJS Furniture Shop',
+      secret,
+    });
 
-  // Lưu secret tạm (chưa enable)
-  await this.prisma.user.update({
-    where: { id: userId },
-    data: { twoFactorSecret: secret },
-  });
+    // Lưu secret tạm (chưa enable)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: secret },
+    });
 
-  const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
-  return {
-    secret,
-    qrCode: qrCodeDataUrl, // frontend hiển thị QR này
-  };
-}
-
-/**
- * Xác nhận mã 2FA lần đầu → chính thức bật 2FA
- */
-async enableTwoFactor(userId: number, token: string) {
-  const user = await this.prisma.user.findUnique({ where: { id: userId } });
-  if (!user || !user.twoFactorSecret) {
-    throw new BadRequestException('Chưa tạo secret 2FA');
+    return {
+      secret,
+      qrCode: qrCodeDataUrl, // frontend hiển thị QR này
+    };
   }
 
-  const result = await verify({
-    token,
-    secret: user.twoFactorSecret,
-  });
+  /**
+   * Xác nhận mã 2FA lần đầu → chính thức bật 2FA
+   */
+  async enableTwoFactor(userId: number, token: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.twoFactorSecret) {
+      throw new BadRequestException('Chưa tạo secret 2FA');
+    }
 
-  if (!result.valid) {
-    throw new UnauthorizedException('Mã 2FA không đúng');
+    const result = await verify({
+      token,
+      secret: user.twoFactorSecret,
+    });
+
+    if (!result.valid) {
+      throw new UnauthorizedException('Mã 2FA không đúng');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { isTwoFactorEnabled: true },
+    });
+
+    return { message: 'Đã bật xác thực 2 lớp thành công' };
   }
 
-  await this.prisma.user.update({
-    where: { id: userId },
-    data: { isTwoFactorEnabled: true },
-  });
+  /**
+   * Tắt 2FA
+   */
+  async disableTwoFactor(userId: number, token: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isTwoFactorEnabled || !user.twoFactorSecret) {
+      throw new BadRequestException('2FA chưa được bật');
+    }
 
-  return { message: 'Đã bật xác thực 2 lớp thành công' };
-}
+    const result = await verify({
+      token,
+      secret: user.twoFactorSecret,
+    });
 
-/**
- * Tắt 2FA
- */
-async disableTwoFactor(userId: number, token: string) {
-  const user = await this.prisma.user.findUnique({ where: { id: userId } });
-  if (!user || !user.isTwoFactorEnabled || !user.twoFactorSecret) {
-    throw new BadRequestException('2FA chưa được bật');
+    if (!result.valid) {
+      throw new UnauthorizedException('Mã 2FA không đúng');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isTwoFactorEnabled: false,
+        twoFactorSecret: null,
+      },
+    });
+
+    return { message: 'Đã tắt xác thực 2 lớp' };
   }
 
-  const result = await verify({
-    token,
-    secret: user.twoFactorSecret,
-  });
-
-  if (!result.valid) {
-    throw new UnauthorizedException('Mã 2FA không đúng');
-  }
-
-  await this.prisma.user.update({
-    where: { id: userId },
-    data: {
-      isTwoFactorEnabled: false,
-      twoFactorSecret: null,
-    },
-  });
-
-  return { message: 'Đã tắt xác thực 2 lớp' };
-}
-
-async getProfile(userId: number) {
-  const user = await this.prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      avatar: true,
-      isTwoFactorEnabled: true,
-      createdAt: true,
-      updatedAt: true,
-      roles: {
-        include: {
-          role: {
-            select: { id: true, name: true },
+  async getProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        avatar: true,
+        isTwoFactorEnabled: true,
+        createdAt: true,
+        updatedAt: true,
+        roles: {
+          include: {
+            role: {
+              select: { id: true, name: true },
+            },
           },
         },
       },
-    },
-  });
+    });
 
-  if (!user) {
-    throw new NotFoundException('Không tìm thấy người dùng');
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
+    return {
+      ...user,
+      roles: user.roles.map((ur) => ur.role),
+    };
   }
 
-  return {
-    ...user,
-    roles: user.roles.map((ur) => ur.role),
-  };
-}
+  async updateProfile(userId: number, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: dto.name,
+        phone: dto.phone,
+        avatar: dto.avatar,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        avatar: true,
+        isTwoFactorEnabled: true,
+        updatedAt: true,
+      },
+    });
 
-async updateProfile(userId: number, dto: UpdateProfileDto) {
-  const user = await this.prisma.user.update({
-    where: { id: userId },
-    data: {
-      name: dto.name,
-      phone: dto.phone,
-      avatar: dto.avatar,
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      avatar: true,
-      isTwoFactorEnabled: true,
-      updatedAt: true,
-    },
-  });
-
-  return {
-    message: 'Cập nhật thông tin thành công',
-    user,
-  };
-}
-
-async changePassword(userId: number, dto: ChangePasswordDto) {
-  const user = await this.prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (!user) {
-    throw new NotFoundException('Không tìm thấy người dùng');
+    return {
+      message: 'Cập nhật thông tin thành công',
+      user,
+    };
   }
 
-  const isValid = await this.hashingService.compare(
-    dto.currentPassword,
-    user.password,
-  );
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
 
-  if (!isValid) {
-    throw new UnauthorizedException('Mật khẩu hiện tại không đúng');
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
+    const isValid = await this.hashingService.compare(
+      dto.currentPassword,
+      user.password,
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException('Mật khẩu hiện tại không đúng');
+    }
+
+    const hashed = await this.hashingService.hash(dto.newPassword);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashed },
+    });
+
+    // Xóa toàn bộ refresh token (bắt buộc login lại)
+    await this.prisma.refreshToken.deleteMany({
+      where: { userId },
+    });
+
+    return {
+      message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
+    };
   }
 
-  const hashed = await this.hashingService.hash(dto.newPassword);
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Không tiết lộ email có tồn tại hay không
+    if (!user) {
+      return { message: 'Nếu email tồn tại, link đặt lại mật khẩu đã được gửi' };
+    }
 
-  await this.prisma.user.update({
-    where: { id: userId },
-    data: { password: hashed },
-  });
+    const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1h
 
-  // Xóa toàn bộ refresh token (bắt buộc login lại)
-  await this.prisma.refreshToken.deleteMany({
-    where: { userId },
-  });
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: token,
+        passwordResetExpires: expires,
+      },
+    });
 
-  return {
-    message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
-  };
-}
+    // TODO: gửi email thật qua Queue
+    // Dev: log token ra console
+    this.logger?.log?.(`Reset token for ${email}: ${token}`);
+    console.log(`[DEV] Reset password link: /reset-password?token=${token}`);
+
+    return { message: 'Nếu email tồn tại, link đặt lại mật khẩu đã được gửi' };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
+    }
+
+    const hashed = await this.hashingService.hash(newPassword);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashed,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    await this.prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+
+    return { message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.' };
+  }
+
+  async sendVerifyEmail(userId: number) {
+    const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailVerifyToken: token, emailVerifyExpires: expires },
+    });
+
+    console.log(`[DEV] Verify email token: ${token}`);
+    return { message: 'Email xác thực đã được gửi (dev: xem console)' };
+  }
+
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        emailVerifyToken: token,
+        emailVerifyExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Token xác thực không hợp lệ hoặc đã hết hạn');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerifyToken: null,
+        emailVerifyExpires: null,
+      },
+    });
+
+    return { message: 'Xác thực email thành công' };
+  }
 
   private async generateTokens(userId: number, email: string) {
     const payload = { sub: userId, email };

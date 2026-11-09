@@ -1,48 +1,87 @@
+version: "3.8"
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: furniture-postgres
-    restart: always
+    container_name: furniture-postgres-dev
+    restart: unless-stopped
     environment:
       POSTGRES_USER: furniture
       POSTGRES_PASSWORD: furniture123
       POSTGRES_DB: furniture_db
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - furniture-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U furniture -d furniture_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: furniture-redis
-    restart: always
+    container_name: furniture-redis-dev
+    restart: unless-stopped
     ports:
-      - '6379:6379'
+      - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_dev_data:/data
+    networks:
+      - furniture-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   app:
-    build: .
-    container_name: furniture-api
-    restart: always
+    build:
+      context: .
+      target: development
+    container_name: furniture-api-dev
+    restart: unless-stopped
     ports:
-      - '3000:3000'
+      - "3000:3000"
     environment:
+      NODE_ENV: development
+      PORT: 3000
       DATABASE_URL: postgresql://furniture:furniture123@postgres:5432/furniture_db?schema=public
       REDIS_URL: redis://redis:6379
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      NODE_ENV: production
-      JWT_SECRET: your-super-secret-jwt-key
-      JWT_REFRESH_SECRET: your-refresh-secret
-      API_KEY: your-api-key
-      # ... các biến khác
-    depends_on:
-      - postgres
-      - redis
+      JWT_SECRET: dev-jwt-secret-change-me
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-me
+      JWT_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      APP_URL: http://localhost:3000
+      # SePay test (để trống vẫn simulate được)
+      SEPAY_BANK_ACCOUNT: "0123456789"
+      SEPAY_ACCOUNT_NAME: "CONG TY NOI THAT TEST"
+      SEPAY_API_TOKEN: ""
+      SEPAY_WEBHOOK_SECRET: ""
+      # Cloudinary (optional khi dev)
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
     volumes:
-      - ./uploads:/app/uploads
+      # Hot reload – mount source code
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - furniture-dev
+    command: sh -c "npx prisma migrate deploy && npx prisma generate && npm run start:dev"
+
+networks:
+  furniture-dev:
+    driver: bridge
 
 volumes:
-  postgres_data:
-  redis_data:
+  postgres_dev_data:
+  redis_dev_data:

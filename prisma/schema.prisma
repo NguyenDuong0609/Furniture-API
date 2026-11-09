@@ -20,6 +20,11 @@ model User {
   twoFactorSecret    String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+  emailVerified          Boolean   @default(false)
+  emailVerifyToken       String?
+  emailVerifyExpires     DateTime?
+  passwordResetToken     String?
+  passwordResetExpires   DateTime?
 
   roles         UserRole[]
   addresses     Address[]
@@ -130,6 +135,10 @@ model Product {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([categoryId, isActive])
+  @@index([isFeatured, isActive])
+  @@index([createdAt])
 }
 
 model ProductImage {
@@ -201,10 +210,17 @@ model Order {
 
   paymentMethod    String?
   paymentStatus    PaymentStatus @default(UNPAID)
+  paymentTransactionId String?     // ID giao dịch SePay / VNPay / MoMo
+  paymentRawData     Json?         // payload gốc để debug
 
   items            OrderItem[]
+  statusHistory    OrderStatusHistory[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@index([paymentStatus, createdAt])
+  @@index([createdAt])
 }
 
 enum OrderStatus {
@@ -215,6 +231,53 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
   REFUNDED
+}
+
+// ===== Lịch sử trạng thái đơn =====
+model OrderStatusHistory {
+  id        Int         @id @default(autoincrement())
+  orderId   Int
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  changedBy Int?        // userId admin
+  createdAt DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+// ===== Coupon =====
+model Coupon {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  type          CouponType // PERCENT | FIXED
+  value         Decimal   // % hoặc số tiền
+  minOrderAmount Decimal? @default(0)
+  maxDiscount   Decimal?  // trần giảm (với PERCENT)
+  usageLimit    Int?      // null = không giới hạn
+  usedCount     Int       @default(0)
+  startAt       DateTime?
+  endAt         DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+// ===== Shipping rule đơn giản =====
+model ShippingRule {
+  id            Int      @id @default(autoincrement())
+  name          String
+  minOrderAmount Decimal @default(0) // đơn từ X thì áp rule
+  fee           Decimal  // phí ship
+  freeAbove     Decimal? // miễn ship từ mức này
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 enum PaymentStatus {

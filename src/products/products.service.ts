@@ -17,7 +17,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {}
+  ) { }
 
   async create(dto: CreateProductDto) {
     // Kiểm tra slug trùng
@@ -61,24 +61,24 @@ export class ProductsService {
         brandId: dto.brandId,
         images: dto.images
           ? {
-              create: dto.images.map((img) => ({
-                url: img.url,
-                alt: img.alt,
-                isMain: img.isMain ?? false,
-                sortOrder: img.sortOrder ?? 0,
-              })),
-            }
+            create: dto.images.map((img) => ({
+              url: img.url,
+              alt: img.alt,
+              isMain: img.isMain ?? false,
+              sortOrder: img.sortOrder ?? 0,
+            })),
+          }
           : undefined,
         variants: dto.variants
           ? {
-              create: dto.variants.map((v) => ({
-                name: v.name,
-                sku: v.sku,
-                price: v.price,
-                stock: v.stock ?? 0,
-                attributes: v.attributes ?? undefined,
-              })),
-            }
+            create: dto.variants.map((v) => ({
+              name: v.name,
+              sku: v.sku,
+              price: v.price,
+              stock: v.stock ?? 0,
+              attributes: v.attributes ?? undefined,
+            })),
+          }
           : undefined,
       },
       include: {
@@ -239,51 +239,51 @@ export class ProductsService {
     return result;
   }
 
-async findBySlug(slug: string) {
-  const cacheKey = `product:slug:${slug}`;
+  async findBySlug(slug: string) {
+    const cacheKey = `product:slug:${slug}`;
 
-  const cached = await this.cacheManager.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
+    const cached = await this.cacheManager.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
-  const product = await this.prisma.product.findUnique({
-    where: { slug },
-    include: {
-      images: { orderBy: { sortOrder: 'asc' } },
-      variants: true,
-      category: true,
-      brand: true,
-      reviews: {
-        include: {
-          user: { select: { id: true, name: true, avatar: true } },
+    const product = await this.prisma.product.findUnique({
+      where: { slug },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: true,
+        category: true,
+        brand: true,
+        reviews: {
+          include: {
+            user: { select: { id: true, name: true, avatar: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
         },
-        orderBy: { createdAt: 'desc' },
-        take: 10,
       },
-    },
-  });
+    });
 
-  if (!product) {
-    throw new NotFoundException(`Không tìm thấy sản phẩm với slug ${slug}`);
+    if (!product) {
+      throw new NotFoundException(`Không tìm thấy sản phẩm với slug ${slug}`);
+    }
+
+    const result = {
+      ...product,
+      // Decimal → number để Redis JSON ổn định
+      price: Number(product.price),
+      salePrice: product.salePrice != null ? Number(product.salePrice) : null,
+      variants: product.variants.map((v) => ({
+        ...v,
+        price: v.price != null ? Number(v.price) : null,
+        attributes: v.attributes ?? null,
+      })),
+    };
+
+    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000); // 5 phút
+
+    return result;
   }
-
-  const result = {
-    ...product,
-    // Decimal → number để Redis JSON ổn định
-    price: Number(product.price),
-    salePrice: product.salePrice != null ? Number(product.salePrice) : null,
-    variants: product.variants.map((v) => ({
-      ...v,
-      price: v.price != null ? Number(v.price) : null,
-      attributes: v.attributes ?? null,
-    })),
-  };
-
-  await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000); // 5 phút
-
-  return result;
-}
 
   async update(id: number, dto: UpdateProductDto) {
     const oldProduct = await this.prisma.product.findUnique({
@@ -342,5 +342,27 @@ async findBySlug(slug: string) {
     await this.cacheManager.del(`product:slug:${product.slug}`);
 
     return deleted;
+  }
+
+  async findRelated(id: number, limit = 8) {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) throw new NotFoundException('Không tìm thấy sản phẩm');
+
+    return this.prisma.product.findMany({
+      where: {
+        isActive: true,
+        id: { not: id },
+        OR: [
+          { categoryId: product.categoryId },
+          { brandId: product.brandId ?? undefined },
+        ],
+      },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        images: { where: { isMain: true }, take: 1 },
+        category: { select: { id: true, name: true, slug: true } },
+      },
+    });
   }
 }
