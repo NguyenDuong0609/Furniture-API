@@ -9,6 +9,7 @@ export const CreateOrderSchema = z.object({
   shippingCity: z.string().optional(),
   shippingDistrict: z.string().optional(),
   paymentMethod: z.enum(['COD', 'BANK_TRANSFER']).default('COD'),
+  email: z.string().email().optional(), // email liên hệ (khách đã đăng nhập không cần nhập)
   note: z.string().optional(),
 });
 

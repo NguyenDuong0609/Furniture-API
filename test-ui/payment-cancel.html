@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bạn đã hủy thanh toán</title>
+  <link rel="stylesheet" href="sepay-ui.css" />
+</head>
+<body>
+  <div class="card">
+    <div id="icon" class="icon warn">!</div>
+    <h1 id="title">Bạn đã hủy thanh toán</h1>
+    <p id="desc">Đơn hàng vẫn được giữ lại. Bạn có thể thanh toán lại bất cứ lúc nào.</p>
+    <div id="meta" class="meta hidden"></div>
+    <button id="retry" class="btn" disabled>Thanh toán lại</button>
+  </div>
+
+<script src="sepay-common.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+(async () => {
+  try {
+    const s = await fetchStatus();
+    $('meta').innerHTML = `<div><span>Mã đơn hàng</span><span>${s.orderCode}</span></div>`;
+    $('meta').classList.remove('hidden');
+
+    if (s.payment === 'PAID') {   // khách đã trả xong ở tab khác rồi mới hủy ở tab này
+      $('icon').className = 'icon ok'; $('icon').textContent = '✓';
+      $('title').textContent = 'Đơn hàng đã được thanh toán';
+      $('desc').textContent = 'Bạn không cần thanh toán lại.';
+      $('retry').classList.add('hidden');
+      return;
+    }
+    $('retry').disabled = false;
+    $('retry').onclick = () => { $('retry').disabled = true; retryPayment(s.orderId); };
+  } catch (e) {
+    $('desc').textContent = 'Không lấy được thông tin giao dịch.';
+  }
+})();
+</script>
+</body>
+</html>

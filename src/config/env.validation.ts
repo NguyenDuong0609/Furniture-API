@@ -9,6 +9,7 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().required(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
   API_KEY: Joi.string().required(),
+  ORDER_TTL_MS: Joi.number().default(30 * 60 * 1000), // 30 phút mặc định
 }).options({
   abortEarly: false,
 });

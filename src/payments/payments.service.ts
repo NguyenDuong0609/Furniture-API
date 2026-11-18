@@ -9,8 +9,25 @@ import { CreatePaymentDto } from './dto/create-payment.dto.js';
 import { randomBytes } from 'crypto';
 import { EventsGateway } from '../events/events.gateway.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
+import { SepayGatewayService } from './sepay/sepay-gateway.service.js';
 import * as crypto from 'crypto';
 import * as qs from 'qs';
+
+export interface SepayIpnPayload {
+  timestamp: number;
+  notification_type: 'ORDER_PAID' | 'TRANSACTION_VOID';
+  order: {
+    id: string; order_id: string; order_status: string;
+    order_amount: string; order_invoice_number: string;[k: string]: any;
+  };
+  transaction: {
+    transaction_id: string; payment_method: string;
+    transaction_status: string; transaction_amount: string;[k: string]: any;
+  };
+  customer?: any;
+}
 
 @Injectable()
 export class PaymentsService {
@@ -20,7 +37,169 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly eventsGateway: EventsGateway,
     private readonly notificationsService: NotificationsService,
+    private sepay: SepayGatewayService,
+    private config: ConfigService,
   ) { }
+
+
+  async createCheckout(userId: number | undefined, orderId: number, method?: any) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    // đơn của user nào thì chỉ user đó thanh toán; đơn guest (userId null) thì ai cũng được
+    if (!order || (order.userId && order.userId !== userId)) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.paymentStatus === 'PAID') throw new BadRequestException('Order already paid');
+    if (order.status === 'CANCELLED') throw new BadRequestException('Order was cancelled');
+
+    // mỗi lần bấm thanh toán = 1 invoice mới. Giả định order.code chỉ gồm chữ/số/gạch ngang
+    const invoiceNumber = `${order.code}-${Date.now()}`;
+    const payment = await this.prisma.payment.create({
+      data: { orderId: order.id, invoiceNumber, amount: order.totalAmount },
+    });
+
+    const base = this.config.getOrThrow('PAYMENT_RESULT_URL');
+    const result = `${base}?invoice=${encodeURIComponent(invoiceNumber)}`;
+
+    return this.sepay.buildCheckout({
+      invoiceNumber,
+      amount: Math.round(Number(payment.amount)),   // số tiền luôn lấy từ DB, không lấy từ client
+      description: `Thanh toan don hang ${order.code}`,
+      successUrl: `${result}&status=success`,
+      errorUrl: `${result}&status=error`,
+      cancelUrl: `${result}&status=cancel`,
+      paymentMethod: method,
+    });
+  }
+
+  async getStatus(userId: number, invoiceNumber: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { invoiceNumber },
+      include: { order: { select: { id: true, code: true, userId: true, status: true, paymentStatus: true } } },
+    });
+    if (!payment || payment.order.userId !== userId) throw new NotFoundException();
+    return {
+      payment: payment.status,
+      orderId: payment.order.id,
+      orderCode: payment.order.code,
+      orderStatus: payment.order.status,
+      orderPaymentStatus: payment.order.paymentStatus,
+      amount: Number(payment.amount),
+      currency: payment.currency,
+      method: payment.method,
+      paidAt: payment.paidAt,
+    };
+  }
+
+  async handleIpn(p: SepayIpnPayload) {
+    const invoice = p.order?.order_invoice_number;
+    const eventKey = `${p.notification_type}:${p.transaction?.transaction_id ?? p.order?.order_id}`;
+
+    if (!invoice) {
+      this.logger.warn('IPN thiếu order.order_invoice_number, bỏ qua');
+      return;
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.findUnique({
+          where: { invoiceNumber: invoice },
+          include: { order: true },
+        });
+
+        // Ghi event TRƯỚC. eventKey unique nên IPN trùng gửi cùng lúc sẽ bị chặn ở đây
+        // (request thứ 2 chờ request 1 commit rồi nhận lỗi P2002).
+        const event = await tx.paymentEvent.create({
+          data: {
+            eventKey,
+            invoiceNumber: invoice,
+            paymentId: payment?.id,
+            notificationType: p.notification_type,
+            payload: p as unknown as Prisma.InputJsonValue,
+          },
+        });
+        const done = (result: string) =>
+          tx.paymentEvent.update({ where: { id: event.id }, data: { result } });
+
+        if (!payment) return void (await done('UNMATCHED'));
+
+        if (p.notification_type === 'ORDER_PAID') {
+          if (payment.status === 'PAID') return void (await done('IGNORED'));
+
+          const amountOk = new Prisma.Decimal(p.order.order_amount).equals(payment.amount);
+          if (!amountOk) {
+            await tx.payment.update({ where: { id: payment.id }, data: { status: 'REVIEW' } });
+            return void (await done('AMOUNT_MISMATCH'));
+          }
+
+          // đơn đã được thanh toán bởi lần thử khác, hoặc đã bị hủy: không tự duyệt
+          if (payment.order.paymentStatus === 'PAID' || payment.order.status === 'CANCELLED') {
+            await tx.payment.update({ where: { id: payment.id }, data: { status: 'REVIEW' } });
+            return void (await done(
+              payment.order.paymentStatus === 'PAID' ? 'DUPLICATE_PAYMENT' : 'ORDER_CANCELLED',
+            ));
+          }
+
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: 'PAID',
+              paidAt: new Date(),
+              method: p.transaction.payment_method,
+              sepayOrderId: p.order.order_id,
+              sepayTransactionId: p.transaction.transaction_id,
+            },
+          });
+
+          const moveToConfirmed = payment.order.status === 'PENDING';
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: {
+              paymentStatus: 'PAID',
+              paymentMethod: p.transaction.payment_method,
+              paymentTransactionId: p.transaction.transaction_id,
+              paymentRawData: p as unknown as Prisma.InputJsonValue,
+              ...(moveToConfirmed && { status: 'CONFIRMED' }),
+            },
+          });
+
+          if (moveToConfirmed) {
+            await tx.orderStatusHistory.create({
+              data: { orderId: payment.orderId, status: 'CONFIRMED', note: 'Đã thanh toán qua SePay' },
+            });
+          }
+          if (payment.order.userId) {
+            await tx.notification.create({
+              data: {
+                userId: payment.order.userId,
+                type: 'ORDER_PAID',
+                title: 'Thanh toán thành công',
+                message: `Đơn hàng ${payment.order.code} đã được thanh toán`,
+                data: { orderId: payment.orderId, orderCode: payment.order.code },
+              },
+            });
+          }
+          return void (await done('PROCESSED'));
+        }
+
+        if (p.notification_type === 'TRANSACTION_VOID') {
+          await tx.payment.update({ where: { id: payment.id }, data: { status: 'VOIDED' } });
+          if (payment.order.paymentTransactionId === p.transaction.transaction_id) {
+            await tx.order.update({
+              where: { id: payment.orderId },
+              data: { paymentStatus: 'REFUNDED' },   // enum hiện có, gần nghĩa nhất với "hủy giao dịch"
+            });
+          }
+          return void (await done('PROCESSED'));
+        }
+
+        await done('IGNORED');
+      });
+    } catch (e) {
+      // IPN trùng đã được xử lý trước đó: coi như thành công để SePay nhận 200
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return;
+      throw e;
+    }
+  }
 
   /**
    * Xác nhận thanh toán COD (Admin hoặc hệ thống)
@@ -325,6 +504,10 @@ export class PaymentsService {
       process.env.SEPAY_WEBHOOK_STRICT === 'true' ||
       process.env.NODE_ENV === 'production';
 
+    if (!strict) {
+      this.logger.warn('[WEBHOOK] Strict mode disabled - skipping signature verification. This is not recommended for production.');
+    }
+
     if (strict) {
       const secret = process.env.SEPAY_WEBHOOK_SECRET;
       const token = process.env.SEPAY_API_TOKEN;
@@ -369,6 +552,12 @@ export class PaymentsService {
     if (!order) {
       this.logger.warn({ orderCode }, 'Order not found');
       return { success: true, message: `Order ${orderCode} not found` };
+    }
+
+    // Đơn đã đi qua Cổng thanh toán SePay thì IPN là nguồn xử lý duy nhất
+    const viaGateway = await this.prisma.payment.count({ where: { orderId: order.id } });
+    if (viaGateway > 0) {
+      return { success: true, message: 'Handled by SePay gateway IPN', orderCode, code: 'GATEWAY_ORDER' };
     }
 
     // 4. Idempotent: đã PAID rồi thì không xử lý lại

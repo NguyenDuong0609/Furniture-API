@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kết quả thanh toán</title>
+  <link rel="stylesheet" href="sepay-ui.css" />
+  <style>
+    body { background: linear-gradient(160deg, #eef2ff 0%, #f4f6fb 45%, #eefaf3 100%); }
+    .receipt {
+      --accent: #2563eb; --accent-2: #60a5fa;
+      position: relative; width: 100%; max-width: 440px; overflow: hidden;
+      background: #fff; border-radius: 20px; border: 1px solid var(--border);
+      box-shadow: 0 20px 50px rgba(20, 30, 60, .12);
+    }
+    .receipt[data-state="ok"]   { --accent: #16a34a; --accent-2: #4ade80; }
+    .receipt[data-state="warn"] { --accent: #d97706; --accent-2: #fbbf24; }
+    .receipt[data-state="err"]  { --accent: #dc2626; --accent-2: #f87171; }
+
+    .hero {
+      padding: 36px 28px 56px; text-align: center; color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      transition: background .4s;
+    }
+    .hero h1 { margin: 16px 0 6px; font-size: 24px; }
+    .hero p { margin: 0; color: rgba(255, 255, 255, .88); font-size: 15px; }
+
+    .badge {
+      width: 84px; height: 84px; margin: 0 auto; border-radius: 50%;
+      background: #fff; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+    }
+    .badge svg { width: 44px; height: 44px; fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+    .badge .ring {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 5px solid #dbe5ff; border-top-color: var(--accent); animation: spin .9s linear infinite;
+    }
+    .pop { animation: pop .5s cubic-bezier(.2, 1.4, .4, 1); }
+    .draw { stroke-dasharray: 60; stroke-dashoffset: 60; animation: draw .5s .25s ease forwards; }
+    @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+
+    .body { position: relative; margin-top: -28px; padding: 0 24px 24px; }
+    .amount-box {
+      padding: 16px; text-align: center; background: #fff; border-radius: 14px;
+      border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(20, 30, 60, .07);
+    }
+    .amount-box small { display: block; color: var(--muted); font-size: 13px; }
+    .amount-box strong { font-size: 30px; letter-spacing: -.5px; color: var(--text); }
+
+    .tear { position: relative; margin: 22px -24px; border-top: 2px dashed var(--border); }
+    .tear::before, .tear::after {
+      content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%; background: #f1f4fb;
+    }
+    .tear::before { left: -11px; } .tear::after { right: -11px; }
+
+    .rows { margin: 0; }
+    .row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; font-size: 14px; }
+    .row dt { color: var(--muted); white-space: nowrap; }
+    .row dd { margin: 0; font-weight: 600; text-align: right; word-break: break-all; }
+    .copy { margin-left: 8px; padding: 0 8px; font-size: 12px; color: var(--primary); background: #eef3ff; border: 0; border-radius: 6px; cursor: pointer; }
+    .pill { padding: 2px 10px; border-radius: 999px; font-size: 12px; background: var(--ok-bg); color: var(--ok); }
+    .pill.warn { background: var(--warn-bg); color: var(--warn); }
+    .pill.err { background: var(--err-bg); color: var(--err); }
+
+    .progress { height: 4px; margin: 18px 0 4px; border-radius: 4px; background: #e8edf9; overflow: hidden; }
+    .progress i { display: block; width: 40%; height: 100%; background: var(--accent); animation: slide 1.2s ease-in-out infinite; }
+    @keyframes slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+    .hint-text { margin: 4px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+
+    .actions { margin-top: 18px; }
+    .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .confetti i { position: absolute; top: -12px; width: 8px; height: 14px; border-radius: 2px; opacity: .9; animation: fall linear forwards; }
+    @keyframes fall { to { transform: translateY(520px) rotate(540deg); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .confetti { display: none; } .draw, .pop, .progress i { animation: none; stroke-dashoffset: 0; } }
+  </style>
+</head>
+<body>
+  <main class="receipt" id="receipt" data-state="loading">
+    <div class="confetti" id="confetti"></div>
+
+    <section class="hero">
+      <div class="badge" id="badge"><div class="ring"></div></div>
+      <h1 id="title">Đang xác nhận thanh toán</h1>
+      <p id="desc">Vui lòng đợi trong giây lát, đừng đóng trang này.</p>
+    </section>
+
+    <section class="body">
+      <div class="amount-box hidden" id="amountBox">
+        <small id="amountLabel">Số tiền</small>
+        <strong id="amount"></strong>
+      </div>
+
+      <div id="loadingBox">
+        <div class="progress"><i></i></div>
+        <p class="hint-text" id="tryText">Đang kiểm tra...</p>
+      </div>
+
+      <div id="detail" class="hidden">
+        <div class="tear"></div>
+        <dl class="rows" id="rows"></dl>
+      </div>
+
+      <div class="actions">
+        <button id="retry" class="btn hidden">Thanh toán lại</button>
+        <a id="again" class="btn ghost hidden" href="pay.html" style="text-align:center;text-decoration:none">Thanh toán đơn khác</a>
+      </div>
+
+      <details>
+        <summary>Chi tiết kỹ thuật</summary>
+        <pre id="raw">{}</pre>
+      </details>
+    </section>
+  </main>
+
+<script src="sepay-common.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const ICONS = {
+  ok:   '<svg viewBox="0 0 52 52" class="pop"><path class="draw" d="M14 27 l8 8 l16 -17"/></svg>',
+  warn: '<svg viewBox="0 0 52 52" class="pop"><path d="M26 12 v18 M26 38 v2"/></svg>',
+  err:  '<svg viewBox="0 0 52 52" class="pop"><path d="M16 16 l20 20 M36 16 l-20 20"/></svg>',
+};
+const METHODS = { BANK_TRANSFER: 'Chuyển khoản QR', NAPAS_BANK_TRANSFER: 'QR NAPAS', CARD: 'Thẻ' };
+const fmtMoney = (n, cur) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: cur || 'VND' }).format(n);
+
+function setState(state, title, desc) {
+  $('receipt').dataset.state = state;
+  $('title').textContent = title;
+  $('desc').textContent = desc;
+  if (ICONS[state]) $('badge').innerHTML = ICONS[state];
+  if (state !== 'loading') $('loadingBox').classList.add('hidden');
+}
+
+function addRow(label, value, opts = {}) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const dt = document.createElement('dt'); dt.textContent = label;
+  const dd = document.createElement('dd');
+  if (opts.pill) {
+    const s = document.createElement('span');
+    s.className = 'pill ' + (opts.pill === 'ok' ? '' : opts.pill);
+    s.textContent = value; dd.appendChild(s);
+  } else dd.textContent = value;
+  if (opts.copy) {
+    const b = document.createElement('button');
+    b.className = 'copy'; b.textContent = 'Sao chép';
+    b.onclick = async () => { await navigator.clipboard.writeText(value); b.textContent = 'Đã chép'; setTimeout(() => (b.textContent = 'Sao chép'), 1200); };
+    dd.appendChild(b);
+  }
+  row.append(dt, dd);
+  $('rows').appendChild(row);
+}
+
+function renderDetail(s, statusLabel, pill) {
+  $('rows').innerHTML = '';
+  addRow('Trạng thái', statusLabel, { pill });
+  addRow('Mã đơn hàng', s.orderCode);
+  addRow('Mã giao dịch', invoice, { copy: true });
+  if (s.method) addRow('Phương thức', METHODS[s.method] || s.method);
+  if (s.paidAt) addRow('Thời gian', new Date(s.paidAt).toLocaleString('vi-VN'));
+  $('detail').classList.remove('hidden');
+  if (s.amount != null) {
+    $('amount').textContent = fmtMoney(s.amount, s.currency);
+    $('amountBox').classList.remove('hidden');
+  }
+}
+
+function confetti() {
+  const box = $('confetti');
+  const colors = ['#16a34a', '#4ade80', '#2563eb', '#f59e0b', '#ec4899'];
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('i');
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[i % colors.length];
+    p.style.animationDuration = 1.6 + Math.random() * 1.4 + 's';
+    p.style.animationDelay = Math.random() * 0.5 + 's';
+    box.appendChild(p);
+  }
+  setTimeout(() => (box.innerHTML = ''), 4000);
+}
+
+function allowRetry(orderId) {
+  const b = $('retry');
+  b.classList.remove('hidden');
+  b.onclick = () => { b.disabled = true; b.textContent = 'Đang chuyển...'; retryPayment(orderId); };
+}
+
+let tries = 0;
+async function poll() {
+  try {
+    const s = await fetchStatus();
+    $('raw').textContent = JSON.stringify(s, null, 2);
+
+    if (s.payment === 'PAID') {
+      setState('ok', 'Thanh toán thành công', 'Cảm ơn bạn! Đơn hàng của bạn đã được ghi nhận.');
+      $('amountLabel').textContent = 'Số tiền đã thanh toán';
+      renderDetail(s, 'Đã thanh toán', 'ok');
+      $('again').classList.remove('hidden');
+      confetti(); return;
+    }
+    if (s.payment === 'REVIEW') {
+      setState('warn', 'Giao dịch đang được kiểm tra', 'Chúng tôi sẽ liên hệ với bạn sớm nhất có thể.');
+      renderDetail(s, 'Đang kiểm tra', 'warn'); return;
+    }
+    if (['FAILED', 'CANCELLED', 'VOIDED', 'REFUNDED'].includes(s.payment)) {
+      setState('err', 'Giao dịch không hoàn tất', 'Bạn có thể thử thanh toán lại.');
+      renderDetail(s, s.payment === 'VOIDED' ? 'Đã hủy giao dịch' : 'Không thành công', 'err');
+      allowRetry(s.orderId); return;
+    }
+    // PENDING: IPN có thể đến chậm hơn redirect vài giây
+    $('tryText').textContent = `Đang kiểm tra... (${tries + 1}/15)`;
+    if (++tries < 15) setTimeout(poll, 2000);
+    else {
+      setState('warn', 'Chưa nhận được xác nhận', 'Hệ thống vẫn đang xử lý. Vui lòng kiểm tra lại đơn hàng sau ít phút.');
+      renderDetail(s, 'Đang xử lý', 'warn');
+    }
+  } catch (e) {
+    setState('err', 'Không lấy được trạng thái', 'Vui lòng thử tải lại trang.');
+  }
+}
+poll();
+</script>
+</body>
+</html>

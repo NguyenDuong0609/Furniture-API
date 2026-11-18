@@ -40,6 +40,8 @@ import { ReviewsModule } from './reviews/reviews.module.js';
 import { AddressesModule } from './addresses/addresses.module.js';
 import { HealthController } from './health/health.controller.js';
 import { CouponsModule } from './coupons/coupons.module.js';
+import { ScheduleModule } from '@nestjs/schedule';
+import { MailModule } from './mail/mail.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -123,6 +125,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
         },
       },
     }),
+    ScheduleModule.forRoot(),
     SharedModule,
     // PostsModule,
     AuthModule,
@@ -143,6 +146,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ReviewsModule,
     AddressesModule,
     CouponsModule,
+    MailModule,
   ],
   controllers: [AppController, HealthController],
   providers: [

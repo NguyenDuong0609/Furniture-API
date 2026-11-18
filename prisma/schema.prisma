@@ -207,20 +207,23 @@ model Order {
   shippingAddress  String
   shippingCity     String?
   shippingDistrict String?
+  contactEmail String?
 
   paymentMethod    String?
-  paymentStatus    PaymentStatus @default(UNPAID)
+  paymentStatus    PaymentTxStatus @default(UNPAID)
   paymentTransactionId String?     // ID giao dịch SePay / VNPay / MoMo
   paymentRawData     Json?         // payload gốc để debug
 
   items            OrderItem[]
   statusHistory    OrderStatusHistory[]
+  payments         Payment[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
   @@index([userId, status])
   @@index([paymentStatus, createdAt])
   @@index([createdAt])
+  @@index([status, paymentStatus, createdAt])
 }
 
 enum OrderStatus {
@@ -244,6 +247,53 @@ model OrderStatusHistory {
   createdAt DateTime    @default(now())
 
   @@index([orderId])
+}
+
+// ===== Payment Status =====
+enum PaymentTxStatus {
+  UNPAID
+  REFUNDED
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  VOIDED
+  REVIEW      // cần người kiểm tra: lệch tiền, thanh toán trùng, đơn đã hủy...
+}
+
+model Payment {
+  id                 Int             @id @default(autoincrement())
+  orderId            Int
+  order              Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  invoiceNumber      String          @unique          // gửi sang SePay, phải duy nhất
+  amount             Decimal         @db.Decimal(15, 2)
+  currency           String          @default("VND")
+  status             PaymentTxStatus @default(PENDING)
+  method             String?                           // BANK_TRANSFER | CARD ...
+  sepayOrderId       String?
+  sepayTransactionId String?
+  paidAt             DateTime?
+  events             PaymentEvent[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  lastCheckedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([orderId, status])
+}
+
+model PaymentEvent {
+  id               Int      @id @default(autoincrement())
+  eventKey         String   @unique                   // `${notification_type}:${transaction_id}`
+  paymentId        Int?
+  payment          Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  invoiceNumber    String?
+  notificationType String
+  payload          Json
+  result           String   @default("RECEIVED")      // PROCESSED | UNMATCHED | AMOUNT_MISMATCH | DUPLICATE_PAYMENT | ...
+  receivedAt       DateTime @default(now())
+
+  @@index([invoiceNumber])
 }
 
 // ===== Coupon =====
@@ -280,12 +330,12 @@ model ShippingRule {
   updatedAt     DateTime @updatedAt
 }
 
-enum PaymentStatus {
-  UNPAID
-  PAID
-  FAILED
-  REFUNDED
-}
+// enum PaymentStatus {
+//   UNPAID
+//   PAID
+//   FAILED
+//   REFUNDED
+// }
 
 model OrderItem {
   id        Int             @id @default(autoincrement())
@@ -383,4 +433,29 @@ model Message {
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
+}
+
+enum EmailStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+model EmailOutbox {
+  id            Int         @id @default(autoincrement())
+  dedupeKey     String      @unique            // vd: order-paid:123
+  to            String                         // nhiều người nhận: ngăn cách bằng dấu phẩy
+  template      String                         // order-paid | order-expired | payment-review
+  payload       Json                           // chỉ chứa ID, nội dung được dựng lúc gửi
+  status        EmailStatus @default(PENDING)
+  attempts      Int         @default(0)
+  nextAttemptAt DateTime    @default(now())
+  lastError     String?
+  messageId     String?
+  sentAt        DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([status, nextAttemptAt])
 }

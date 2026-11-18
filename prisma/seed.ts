@@ -30,6 +30,8 @@ async function main() {
     { name: 'user:read', description: 'Xem danh sách user' },
     { name: 'user:update', description: 'Sửa user' },
     { name: 'user:delete', description: 'Xóa user' },
+    { name: 'payment:read', description: 'Xem giao dịch thanh toán' },
+    { name: 'payment:resolve', description: 'Xử lý giao dịch cần kiểm tra' },
   ];
 
   for (const p of permissions) {

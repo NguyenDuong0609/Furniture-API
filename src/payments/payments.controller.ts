@@ -8,17 +8,50 @@
   Headers,
   Req,
   BadRequestException,
+  UseGuards,
+  HttpCode,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service.js';
+import type { SepayIpnPayload } from './payments.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
 import { ConfirmCodDto } from './dto/confirm-cod.dto.js';
 import { Public } from '../shared/decorators/public.decorator.js';
 import { ActiveUser } from '../shared/decorators/active-user.decorator.js';
 import { SkipThrottle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'crypto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) { }
+  constructor(private readonly paymentsService: PaymentsService, private config: ConfigService) { }
+
+  // @UseGuards(JwtAuthGuard)             // dùng guard JWT sẵn có của bạn
+  @Public()
+  @Post('checkout')
+  checkout(@Req() req: any, @Body() body: { orderId: number; paymentMethod?: any }) {
+    return this.paymentsService.createCheckout(req.user?.id, body.orderId, body.paymentMethod);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':invoice/status')
+  status(@Req() req: any, @Param('invoice') invoice: string) {
+    return this.paymentsService.getStatus(req.user.id, invoice);
+  }
+
+  @Public()                            // nếu có global guard thì phải bỏ qua endpoint này
+  @Post('ipn')
+  @HttpCode(200)
+  async ipn(@Headers('x-secret-key') secret: string, @Body() body: SepayIpnPayload) {
+    const expected = Buffer.from(this.config.getOrThrow('SEPAY_IPN_SECRET'));
+    const got = Buffer.from(secret ?? '');
+    if (got.length !== expected.length || !timingSafeEqual(got, expected)) {
+      throw new UnauthorizedException();
+    }
+    await this.paymentsService.handleIpn(body);
+    return { success: true };
+  }
 
   /** Admin xác nhận COD đã thu tiền */
   @Post('confirm-cod')

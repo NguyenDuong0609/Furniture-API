@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Test thanh toán SePay</title>
+  <link rel="stylesheet" href="sepay-ui.css" />
+</head>
+<body>
+  <div class="card left">
+    <h1>Test thanh toán SePay</h1>
+    <p>Trang thử nghiệm: chọn đơn hàng rồi chuyển sang cổng thanh toán.</p>
+
+    <label for="api">API base</label>
+    <input id="api" value="http://localhost:3000" />
+
+    <label for="token">JWT access token</label>
+    <textarea id="token" rows="3" placeholder="Bỏ trống nếu đơn của khách vãng lai"></textarea>
+
+    <label for="orderId">Order ID</label>
+    <input id="orderId" type="number" min="1" placeholder="Lấy từ API tạo đơn trên Postman" />
+
+    <label for="method">Phương thức</label>
+    <select id="method">
+      <option value="BANK_TRANSFER">QR chuyển khoản</option>
+      <option value="CARD">Thẻ</option>
+    </select>
+
+    <button id="payBtn" class="btn" style="margin-top:20px" onclick="pay()">Thanh toán</button>
+    <div id="error" class="alert hidden"></div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+$('api').value = localStorage.getItem('api') || $('api').value;
+$('token').value = localStorage.getItem('token') || '';
+
+async function pay() {
+  const api = $('api').value.trim();
+  const token = $('token').value.trim();
+  const orderId = Number($('orderId').value);
+  const err = $('error');
+  err.classList.add('hidden');
+  if (!orderId) { err.textContent = 'Nhập Order ID.'; err.classList.remove('hidden'); return; }
+
+  localStorage.setItem('api', api);
+  localStorage.setItem('token', token);   // các trang kết quả đọc lại từ đây
+
+  const btn = $('payBtn');
+  btn.disabled = true; btn.textContent = 'Đang chuyển sang SePay...';
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    const res = await fetch(api + '/payments/sepay/checkout', {
+      method: 'POST', headers,
+      body: JSON.stringify({ orderId, paymentMethod: $('method').value }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || JSON.stringify(data));
+
+    const { checkoutUrl, fields } = data.data ?? data;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = checkoutUrl;
+    for (const [k, v] of Object.entries(fields)) {
+      const i = document.createElement('input');
+      i.type = 'hidden'; i.name = k; i.value = String(v);
+      form.appendChild(i);
+    }
+    document.body.appendChild(form);
+    form.submit();
+  } catch (e) {
+    err.textContent = e.message; err.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'Thanh toán';
+  }
+}
+</script>
+</body>
+</html>

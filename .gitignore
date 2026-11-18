@@ -67,3 +67,5 @@ uploads/
 .cursor/
 .agents/
 .devin/
+.kiro/
+.vscode/

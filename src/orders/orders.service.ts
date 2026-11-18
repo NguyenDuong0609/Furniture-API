@@ -39,8 +39,10 @@ export class OrdersService {
    */
   async create(dto: CreateOrderDto, userId?: number) {
     try {
-      // 1. Lấy cart
+      // 1. Lấy cart và user email
       let cart;
+      let userEmail = dto.email; // email từ DTO (cho guest)
+
       if (userId) {
         cart = await this.prisma.cart.findFirst({
           where: { userId },
@@ -53,6 +55,15 @@ export class OrdersService {
             },
           },
         });
+
+        // Lấy email của user đã đăng nhập
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        });
+        if (user) {
+          userEmail = user.email;
+        }
       } else {
         if (!dto.sessionId) {
           throw new BadRequestException('sessionId là bắt buộc với khách');
@@ -122,6 +133,7 @@ export class OrdersService {
             shippingCity: dto.shippingCity,
             shippingDistrict: dto.shippingDistrict,
             paymentMethod: dto.paymentMethod,
+            contactEmail: userEmail,
             paymentStatus: 'UNPAID',
             items: {
               create: orderItemsData,
@@ -224,7 +236,7 @@ export class OrdersService {
       await this.orderQueueService.addSendOrderEmailJob({
         orderId: order.id,
         orderCode: order.code,
-        email: undefined, // sau này lấy từ user.email
+        email: userEmail,
         totalAmount: order.totalAmount.toNumber(),
       });
 
@@ -335,7 +347,35 @@ export class OrdersService {
     }
 
     // Hoàn tồn kho + cập nhật trạng thái
+    // await this.prisma.$transaction(async (tx) => {
+    //   for (const item of order.items) {
+    //     if (item.variantId) {
+    //       await tx.productVariant.update({
+    //         where: { id: item.variantId },
+    //         data: { stock: { increment: item.quantity } },
+    //       });
+    //     } else {
+    //       await tx.product.update({
+    //         where: { id: item.productId },
+    //         data: { stock: { increment: item.quantity } },
+    //       });
+    //     }
+    //   }
+
+    //   await tx.order.update({
+    //     where: { id },
+    //     data: { status: 'CANCELLED' },
+    //   });
+    // });
+    // Hoàn tồn kho + cập nhật trạng thái
     await this.prisma.$transaction(async (tx) => {
+      // khóa dòng order và đọc lại: tránh đua với IPN / job quá hạn
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id} FOR UPDATE`;
+      const fresh = await tx.order.findUnique({ where: { id }, select: { status: true, paymentStatus: true } });
+      if (!fresh || fresh.status !== 'PENDING' || fresh.paymentStatus !== 'UNPAID') {
+        throw new BadRequestException('Đơn hàng không còn ở trạng thái có thể hủy');
+      }
+
       for (const item of order.items) {
         if (item.variantId) {
           await tx.productVariant.update({
@@ -350,9 +390,9 @@ export class OrdersService {
         }
       }
 
-      await tx.order.update({
-        where: { id },
-        data: { status: 'CANCELLED' },
+      await tx.order.update({ where: { id }, data: { status: 'CANCELLED' } });
+      await tx.orderStatusHistory.create({
+        data: { orderId: id, status: 'CANCELLED', note: 'Khách hàng tự hủy đơn' },
       });
     });
 

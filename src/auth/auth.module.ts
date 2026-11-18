@@ -6,10 +6,12 @@ import { AuthService } from './auth.service.js';
 import { SharedModule } from '../shared/shared.module.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { PassportModule } from '@nestjs/passport';
+import { MailModule } from '../mail/mail.module.js';
 
 @Module({
   imports: [
     SharedModule,
+    MailModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

@@ -16,6 +16,7 @@ import { I18nContext, I18nService } from 'nestjs-i18n';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { randomBytes } from 'crypto';
+import { MailOutboxService } from '../mail/mail-outbox.service.js';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +28,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly i18n: I18nService,
+    private readonly mailOutbox: MailOutboxService,
   ) { }
 
   async register(registerDto: RegisterDto) {
@@ -423,10 +425,19 @@ export class AuthService {
       },
     });
 
-    // TODO: gửi email thật qua Queue
-    // Dev: log token ra console
-    this.logger?.log?.(`Reset token for ${email}: ${token}`);
-    console.log(`[DEV] Reset password link: /reset-password?token=${token}`);
+    // Gửi email reset password
+    const resetPasswordUrl = this.configService.get<string>('MAIL_RESET_PASSWORD_URL') || 'http://localhost:3000/reset-password';
+    const resetLink = `${resetPasswordUrl}?token=${token}`;
+
+    await this.mailOutbox.enqueue({
+      dedupeKey: `forgot-password:${email}`,
+      to: email,
+      template: 'forgot-password',
+      payload: { email, resetLink, expiresAt: expires },
+    });
+
+    // Gửi ngay thay vì chờ cron
+    this.mailOutbox.kick();
 
     return { message: 'Nếu email tồn tại, link đặt lại mật khẩu đã được gửi' };
   }
@@ -459,6 +470,11 @@ export class AuthService {
   }
 
   async sendVerifyEmail(userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
     const token = randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -467,8 +483,21 @@ export class AuthService {
       data: { emailVerifyToken: token, emailVerifyExpires: expires },
     });
 
-    console.log(`[DEV] Verify email token: ${token}`);
-    return { message: 'Email xác thực đã được gửi (dev: xem console)' };
+    // Gửi email xác thực
+    const verifyEmailUrl = this.configService.get<string>('MAIL_VERIFY_EMAIL_URL') || 'http://localhost:3000/verify-email';
+    const verifyLink = `${verifyEmailUrl}?token=${token}`;
+
+    await this.mailOutbox.enqueue({
+      dedupeKey: `verify-email:${user.email}`,
+      to: user.email,
+      template: 'verify-email',
+      payload: { email: user.email, verifyLink, expiresAt: expires },
+    });
+
+    // Gửi ngay thay vì chờ cron
+    this.mailOutbox.kick();
+
+    return { message: 'Email xác thực đã được gửi' };
   }
 
   async verifyEmail(token: string) {
