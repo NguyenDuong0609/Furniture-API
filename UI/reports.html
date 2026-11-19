@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Báo cáo</title>
+<style>
+  :root { --brand:#1f4e78; --line:#e3e7ef; --muted:#6b7385; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#1d2433; background:#f4f6fb; display:flex; min-height:100vh; }
+  aside { width:250px; background:#fff; border-right:1px solid var(--line); padding:16px; overflow:auto; }
+  aside h4 { margin:16px 0 6px; font-size:12px; text-transform:uppercase; color:var(--muted); }
+  aside button { display:block; width:100%; text-align:left; padding:8px 10px; border:0; background:none; border-radius:8px; cursor:pointer; font:inherit; }
+  aside button:hover { background:#eef3ff; } aside button.active { background:var(--brand); color:#fff; }
+  main { flex:1; padding:20px; min-width:0; }
+  .conn input { width:100%; margin-bottom:6px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; }
+  h2 { margin:0 0 4px; } .desc { color:var(--muted); margin:0 0 14px; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .bar label { display:block; font-size:12px; color:var(--muted); margin-bottom:2px; }
+  .bar input, .bar select { padding:6px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; min-width:120px; }
+  button.btn { padding:7px 14px; border:0; border-radius:8px; background:var(--brand); color:#fff; cursor:pointer; font:inherit; }
+  button.btn.ghost { background:#fff; color:var(--brand); border:1px solid var(--brand); }
+  button.btn:disabled { opacity:.5; cursor:not-allowed; }
+  .kpis { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+  .kpi { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 14px; min-width:150px; }
+  .kpi small { color:var(--muted); display:block; } .kpi b { font-size:18px; }
+  .wrap { background:#fff; border:1px solid var(--line); border-radius:10px; overflow:auto; max-height:60vh; }
+  table { border-collapse:collapse; width:100%; }
+  th { position:sticky; top:0; background:var(--brand); color:#fff; padding:8px 10px; text-align:left; white-space:nowrap; cursor:pointer; user-select:none; }
+  th.nosort { cursor:default; } td { padding:7px 10px; border-top:1px solid var(--line); white-space:nowrap; }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; } tr:hover td { background:#f8faff; }
+  .pager { display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .grow { flex:1; } .msg { color:var(--muted); } .err { color:#c0392b; }
+  .export { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="conn">
+    <input id="api" placeholder="API base" />
+    <input id="token" placeholder="JWT token (Bearer)" />
+    <button class="btn ghost" onclick="init()">Kết nối</button>
+  </div>
+  <div id="menu"></div>
+</aside>
+<main>
+  <h2 id="title">Chọn một báo cáo</h2>
+  <p class="desc" id="desc"></p>
+  <div class="bar" id="filters"></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="wrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  <div class="pager">
+    <button class="btn ghost" id="prev" onclick="go(-1)">‹ Trước</button>
+    <span id="pageInfo" class="msg"></span>
+    <button class="btn ghost" id="next" onclick="go(1)">Sau ›</button>
+    <span class="grow"></span>
+    <div class="export">
+      <select id="delim" title="Dấu phân cách CSV">
+        <option value=",">CSV dấu phẩy (,)</option>
+        <option value=";">CSV dấu chấm phẩy (;) — Excel tiếng Việt</option>
+        <option value="&#9;">CSV Tab</option>
+      </select>
+      <label class="msg"><input type="checkbox" id="gzip" /> nén .gz</label>
+      <button class="btn" onclick="doExport('xlsx')">Xuất Excel</button>
+      <button class="btn" onclick="doExport('csv')">Xuất CSV</button>
+    </div>
+  </div>
+  <p id="status" class="msg"></p>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const unwrap = (j) => (j && j.data !== undefined && !Array.isArray(j) ? j.data : j);
+const money = new Intl.NumberFormat('vi-VN');
+let API, TOKEN, catalog, def, page = 1, sortBy = null, sortDir = null, cursors = [null], cur = 0, nextCursor = null;
+
+$('#api').value = localStorage.getItem('api') || 'http://localhost:3000';
+$('#token').value = localStorage.getItem('token') || '';
+
+const authHeaders = (json) => ({ ...(json ? { 'Content-Type': 'application/json' } : {}), Authorization: 'Bearer ' + TOKEN });
+async function call(path, opts = {}) {
+  const res = await fetch(API + path, { ...opts, headers: { ...authHeaders(!!opts.body), ...(opts.headers || {}) } });
+  if (!res.ok) { let m = res.statusText; try { const j = await res.json(); m = j.message || JSON.stringify(j); } catch {} throw new Error(m); }
+  return res;
+}
+const api = async (path, opts) => unwrap(await (await call(path, opts)).json());
+
+async function init() {
+  API = $('#api').value.trim(); TOKEN = $('#token').value.trim();
+  localStorage.setItem('api', API); localStorage.setItem('token', TOKEN);
+  try { catalog = await api('/admin/reports'); } catch (e) { return say(e.message, true); }
+  const groups = {};
+  catalog.reports.forEach((r) => (groups[r.group] ??= []).push(r));
+  $('#menu').innerHTML = Object.entries(groups).map(([g, rs]) =>
+    `<h4>${g}</h4>` + rs.map((r) => `<button data-id="${r.id}" onclick="pick('${r.id}')">${r.title}</button>`).join('')).join('');
+  say('');
+}
+
+function pick(id) {
+  def = catalog.reports.find((r) => r.id === id);
+  document.querySelectorAll('aside button[data-id]').forEach((b) => b.classList.toggle('active', b.dataset.id === id));
+  $('#title').textContent = def.title; $('#desc').textContent = def.description;
+  sortBy = null; sortDir = null; buildFilters(); reload(true);
+}
+
+const today = new Date();
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const PRESETS = {
+  thisMonth: () => [new Date(today.getFullYear(), today.getMonth(), 1), today],
+  lastMonth: () => [new Date(today.getFullYear(), today.getMonth() - 1, 1), new Date(today.getFullYear(), today.getMonth(), 0)],
+  thisQuarter: () => { const q = Math.floor(today.getMonth() / 3) * 3; return [new Date(today.getFullYear(), q, 1), today]; },
+  lastQuarter: () => { const q = Math.floor(today.getMonth() / 3) * 3; return [new Date(today.getFullYear(), q - 3, 1), new Date(today.getFullYear(), q, 0)]; },
+  thisYear: () => [new Date(today.getFullYear(), 0, 1), today],
+  last30: () => [new Date(today.getTime() - 29 * 864e5), today],
+};
+const SELECTS = {
+  basis: ['Cơ sở ngày', [['PAID', 'Ngày thu tiền'], ['ORDER', 'Ngày đặt hàng']]],
+  groupBy: ['Nhóm theo', [['day', 'Ngày'], ['week', 'Tuần'], ['month', 'Tháng'], ['quarter', 'Quý'], ['year', 'Năm']]],
+  metric: ['Xếp hạng theo', [['quantity', 'Số lượng'], ['revenue', 'Doanh thu']]],
+  dimension: ['Chiều', [['category', 'Danh mục'], ['brand', 'Thương hiệu']]],
+};
+function buildFilters() {
+  const opt = (arr) => arr.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+  const L = catalog.lookups;
+  let h = `<div><label>Từ ngày</label><input type="date" id="f_from"></div><div><label>Đến ngày</label><input type="date" id="f_to"></div>
+    <div><label>Nhanh</label><select id="preset"><option value="">—</option><option value="thisMonth">Tháng này</option><option value="lastMonth">Tháng trước</option>
+    <option value="thisQuarter">Quý này</option><option value="lastQuarter">Quý trước</option><option value="thisYear">Năm nay</option><option value="last30">30 ngày qua</option></select></div>`;
+  for (const k of def.filters) {
+    if (SELECTS[k]) h += `<div><label>${SELECTS[k][0]}</label><select id="f_${k}">${opt(SELECTS[k][1])}</select></div>`;
+    else if (k === 'categoryId') h += `<div><label>Danh mục</label><select id="f_categoryId"><option value="">Tất cả</option>${opt(L.categories.map((c) => [c.id, c.name]))}</select></div>`;
+    else if (k === 'brandId') h += `<div><label>Thương hiệu</label><select id="f_brandId"><option value="">Tất cả</option>${opt(L.brands.map((c) => [c.id, c.name]))}</select></div>`;
+    else if (k === 'paymentMethod') h += `<div><label>Thanh toán</label><select id="f_paymentMethod"><option value="">Tất cả</option>${opt(L.paymentMethods.map((x) => [x, x]))}</select></div>`;
+    else if (k === 'status') h += `<div><label>Trạng thái đơn</label><select id="f_status"><option value="">Tất cả</option>${opt(L.statuses.map((x) => [x, x]))}</select></div>`;
+    else if (k === 'city') h += `<div><label>Tỉnh/Thành</label><input id="f_city" placeholder="Hà Nội"></div>`;
+    else if (k === 'maxUnits') h += `<div><label>Bán tối đa (SL)</label><input id="f_maxUnits" type="number" min="0" value="0"></div>`;
+  }
+  if (def.searchable) h += `<div><label>Tìm kiếm</label><input id="f_q" placeholder="${def.detail ? 'Mã đơn hoặc SĐT' : 'Từ khóa'}"></div>`;
+  h += `<button class="btn" onclick="reload(true)">Áp dụng</button>`;
+  $('#filters').innerHTML = h;
+  const [a, b] = PRESETS.thisMonth(); $('#f_from').value = iso(a); $('#f_to').value = iso(b);
+  $('#preset').onchange = (e) => { if (e.target.value) { const [x, y] = PRESETS[e.target.value](); $('#f_from').value = iso(x); $('#f_to').value = iso(y); reload(true); } };
+  $('#f_q')?.addEventListener('keydown', (e) => e.key === 'Enter' && reload(true));
+}
+
+function filters() {
+  const o = { from: $('#f_from').value, to: $('#f_to').value };
+  $('#filters').querySelectorAll('[id^="f_"]').forEach((el) => {
+    const k = el.id.slice(2);
+    if (!['from', 'to'].includes(k) && el.value !== '') o[k] = el.value;
+  });
+  return o;
+}
+
+function fmt(v, t) {
+  if (v === null || v === undefined || v === '') return '';
+  if (t === 'money' || t === 'int') return money.format(Number(v));
+  if (t === 'percent') return (Number(v) * 100).toFixed(1) + '%';
+  if (t === 'date') return new Date(v).toISOString().slice(0, 10);
+  if (t === 'datetime') return new Date(v).toISOString().replace('T', ' ').slice(0, 19);
+  return String(v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+async function reload(reset) {
+  if (!def) return;
+  if (reset) { page = 1; cursors = [null]; cur = 0; }
+  const qs = new URLSearchParams({ ...filters(), limit: def.detail ? 50 : 25, page });
+  if (sortBy) { qs.set('sortBy', sortBy); qs.set('sortDir', sortDir); }
+  if (def.detail && cursors[cur]) qs.set('cursor', cursors[cur]);
+  say('Đang tải...');
+  try {
+    const r = await api(`/admin/reports/${def.id}?${qs}`);
+    render(r); say('');
+  } catch (e) { say(e.message, true); }
+}
+
+function render(r) {
+  const cols = r.columns;
+  $('#thead').innerHTML = '<tr>' + cols.map((c) => {
+    const s = def.sortable.includes(c.key), arrow = sortBy === c.key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+    return `<th class="${s ? '' : 'nosort'}" ${s ? `onclick="sort('${c.key}')"` : ''}>${c.header}${arrow}</th>`;
+  }).join('') + '</tr>';
+  $('#tbody').innerHTML = r.rows.length
+    ? r.rows.map((row) => '<tr>' + cols.map((c) => `<td class="${['int', 'money', 'percent'].includes(c.type) ? 'n' : ''}">${fmt(row[c.key], c.type)}</td>`).join('') + '</tr>').join('')
+    : `<tr><td colspan="${cols.length}" class="msg">Không có dữ liệu trong khoảng đã chọn.</td></tr>`;
+
+  const k = [];
+  if (!def.detail) {
+    k.push(`<div class="kpi"><small>Số dòng</small><b>${money.format(r.total)}</b></div>`);
+    cols.filter((c) => c.total).forEach((c) => k.push(`<div class="kpi"><small>Tổng ${c.header}</small><b>${fmt(r.sums?.[c.key] ?? 0, c.type)}</b></div>`));
+  }
+  $('#kpis').innerHTML = k.join('');
+
+  if (def.detail) {
+    nextCursor = r.nextCursor;
+    $('#pageInfo').textContent = `Lô ${cur + 1} · ${r.rows.length} dòng`;
+    $('#prev').disabled = cur === 0; $('#next').disabled = !nextCursor || r.rows.length === 0;
+  } else {
+    const pages = Math.max(1, Math.ceil(r.total / r.limit));
+    $('#pageInfo').textContent = `Trang ${r.page}/${pages} · ${money.format(r.total)} dòng`;
+    $('#prev').disabled = r.page <= 1; $('#next').disabled = r.page >= pages;
+  }
+}
+function go(d) {
+  if (def.detail) { if (d > 0) cursors[cur + 1] = nextCursor; cur += d; } else page += d;
+  reload(false);
+}
+function sort(key) {
+  if (sortBy === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc'; else { sortBy = key; sortDir = 'desc'; }
+  reload(true);
+}
+
+async function doExport(format) {
+  if (!def) return;
+  const body = { ...filters(), format, delimiter: $('#delim').value, gzip: $('#gzip').checked };
+  say('Đang tạo file...');
+  try {
+    const res = await call(`/admin/reports/${def.id}/export`, { method: 'POST', body: JSON.stringify(body) });
+    if ((res.headers.get('content-type') || '').includes('application/json')) {
+      const j = unwrap(await res.json());
+      if (j.mode === 'async') return pollExport(j.exportId);
+    }
+    const blob = await res.blob();
+    const f = filters();
+    save(blob, `${def.id}_${f.from}_${f.to}.${format}`);
+    say('Đã tải xong.');
+  } catch (e) { say(e.message, true); }
+}
+
+async function pollExport(id) {
+  for (;;) {
+    const s = await api(`/admin/reports/exports/${id}`);
+    if (s.status === 'DONE') {
+      const { url } = await api(`/admin/reports/exports/${id}/link`, { method: 'POST' });
+      say(`Hoàn tất (${money.format(s.rowCount)} dòng). Đang tải...`);
+      location.href = API + url;                  // trình duyệt tải thẳng file lớn, không đi qua bộ nhớ trang
+      return;
+    }
+    if (s.status === 'FAILED' || s.status === 'EXPIRED') return say('Xuất báo cáo thất bại: ' + (s.error || s.status), true);
+    say(`Dữ liệu lớn, đang xử lý nền (${s.status === 'QUEUED' ? 'đang chờ' : 'đang chạy'})... có thể đóng trang và quay lại sau trong lịch sử export.`);
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+function save(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+function say(t, err) { const s = $('#status'); s.textContent = t; s.className = err ? 'err' : 'msg'; }
+if ($('#token').value) init();
+</script>
+</body>
+</html>

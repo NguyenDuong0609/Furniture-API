@@ -1,0 +1,1255 @@
+{
+  "info": {
+    "name": "NestJS E-commerce - Reports API",
+    "description": "Collection for testing Reports API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string",
+      "description": "Điền access token sau khi login"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Catalog - Danh sách báo cáo",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports"]
+        },
+        "description": "Lấy danh sách tất cả báo cáo có sẵn, kèm quyền truy cập của user"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"order-lines\": {\n    \"id\": \"order-lines\",\n    \"title\": \"Bảng kê chi tiết bán hàng\",\n    \"description\": \"Mỗi dòng là một sản phẩm của một đơn hàng...\",\n    \"group\": \"Chi tiết\",\n    \"filters\": [\"basis\", \"status\", \"paymentMethod\", \"city\", \"categoryId\", \"brandId\"],\n    \"columns\": [...],\n    \"canRead\": true,\n    \"canExport\": true,\n    \"canPii\": true\n  },\n  \"revenue-by-period\": {...},\n  ...\n}"
+        }
+      ]
+    },
+    {
+      "name": "2. Report Data - Bảng kê chi tiết bán hàng",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/order-lines?from=2026-01-01&to=2026-12-31&basis=PAID&limit=50",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "order-lines"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01",
+              "description": "Ngày bắt đầu (YYYY-MM-DD)"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31",
+              "description": "Ngày kết thúc (YYYY-MM-DD)"
+            },
+            {
+              "key": "basis",
+              "value": "PAID",
+              "description": "PAID=ngày thu tiền, ORDER=ngày đặt hàng"
+            },
+            {
+              "key": "status",
+              "value": "DELIVERED",
+              "description": "Optional: PENDING, CONFIRMED, PROCESSING, SHIPPING, DELIVERED, CANCELLED, REFUNDED",
+              "disabled": true
+            },
+            {
+              "key": "paymentMethod",
+              "value": "COD",
+              "description": "Optional: COD, BANK_TRANSFER, SEPAY_BANK_TRANSFER",
+              "disabled": true
+            },
+            {
+              "key": "city",
+              "value": "Hà Nội",
+              "description": "Optional: Tỉnh/Thành",
+              "disabled": true
+            },
+            {
+              "key": "categoryId",
+              "value": "1",
+              "description": "Optional: ID danh mục",
+              "disabled": true
+            },
+            {
+              "key": "brandId",
+              "value": "1",
+              "description": "Optional: ID thương hiệu",
+              "disabled": true
+            },
+            {
+              "key": "q",
+              "value": "BENCH1",
+              "description": "Optional: Tìm kiếm theo mã đơn hoặc SĐT",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50",
+              "description": "Số dòng trả về (1-200)"
+            },
+            {
+              "key": "page",
+              "value": "1",
+              "description": "Trang số"
+            },
+            {
+              "key": "cursor",
+              "value": "",
+              "description": "Optional: Cursor cho phân trang keyset",
+              "disabled": true
+            }
+          ]
+        },
+        "description": "Lấy dữ liệu báo cáo chi tiết đơn hàng"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/order-lines?from=2026-01-01&to=2026-12-31&basis=PAID&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "order-lines"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "basis",
+                  "value": "PAID"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"total\": 1000000,\n  \"rows\": [\n    {\n      \"order_code\": \"BENCH1\",\n      \"order_date\": \"2026-03-10T12:00:00\",\n      \"paid_at\": \"2026-03-10T12:05:00\",\n      \"order_status\": \"DELIVERED\",\n      \"payment_status\": \"PAID\",\n      \"payment_method\": \"COD\",\n      \"customer_name\": \"Khách 1\",\n      \"phone\": \"0900000001\",\n      \"city\": \"Hà Nội\",\n      \"district\": null,\n      \"sku\": \"SOFA-GRAY-L\",\n      \"product\": \"Sản phẩm bench 1\",\n      \"category\": \"Sofa\",\n      \"brand\": \"MOHO\",\n      \"quantity\": 2,\n      \"unit_price\": 250000,\n      \"line_total\": 500000,\n      \"order_total\": 530000\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Số đơn hàng\",\n    \"total\": 1000000,\n    \"sums\": {\n      \"quantity\": 3000000,\n      \"line_total\": 750000000000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "3. Report Data - Doanh thu theo kỳ",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/revenue-by-period?from=2026-01-01&to=2026-12-31&basis=PAID&groupBy=month",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "revenue-by-period"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "groupBy",
+              "value": "month",
+              "description": "day, week, month, quarter, year"
+            },
+            {
+              "key": "paymentMethod",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "city",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "sortBy",
+              "value": "bucket_start",
+              "description": "Optional: bucket_start, period, orders, units, net_revenue, aov, growth",
+              "disabled": true
+            },
+            {
+              "key": "sortDir",
+              "value": "asc",
+              "description": "Optional: asc, desc",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Doanh thu thuần theo ngày/tuần/tháng/quý/năm"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/revenue-by-period?from=2026-01-01&to=2026-12-31&basis=PAID&groupBy=month",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "revenue-by-period"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "basis",
+                  "value": "PAID"
+                },
+                {
+                  "key": "groupBy",
+                  "value": "month"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"total\": 12,\n  \"rows\": [\n    {\n      \"period\": \"2026-01\",\n      \"orders\": 50000,\n      \"units\": 150000,\n      \"gross_items\": 7500000000,\n      \"discount\": 500000000,\n      \"shipping\": 1500000000,\n      \"net_revenue\": 8500000000,\n      \"aov\": 170000,\n      \"prev_revenue\": null,\n      \"growth\": null\n    },\n    {\n      \"period\": \"2026-02\",\n      \"orders\": 52000,\n      \"units\": 156000,\n      \"gross_items\": 7800000000,\n      \"discount\": 520000000,\n      \"shipping\": 1560000000,\n      \"net_revenue\": 8840000000,\n      \"aov\": 170000,\n      \"prev_revenue\": 8500000000,\n      \"growth\": 0.04\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Tổng\",\n    \"total\": 12,\n    \"sums\": {\n      \"orders\": 1000000,\n      \"units\": 3000000,\n      \"net_revenue\": 100000000000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "4. Report Data - Sản phẩm bán chạy",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/top-products?from=2026-01-01&to=2026-12-31&basis=PAID&metric=revenue",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "top-products"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "metric",
+              "value": "revenue",
+              "description": "quantity hoặc revenue"
+            },
+            {
+              "key": "categoryId",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "brandId",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "paymentMethod",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "city",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "q",
+              "value": "sofa",
+              "description": "Optional: Tìm kiếm theo tên/SKU/danh mục/thương hiệu",
+              "disabled": true
+            },
+            {
+              "key": "sortBy",
+              "value": "rank_no",
+              "description": "Optional: rank_no, sku, product, units, orders, revenue, avg_price, revenue_share",
+              "disabled": true
+            },
+            {
+              "key": "sortDir",
+              "value": "asc",
+              "description": "Optional: asc, desc",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Xếp hạng sản phẩm theo số lượng hoặc doanh thu, kèm phân loại ABC"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/top-products?from=2026-01-01&to=2026-12-31&basis=PAID&metric=revenue",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "top-products"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "basis",
+                  "value": "PAID"
+                },
+                {
+                  "key": "metric",
+                  "value": "revenue"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"total\": 3,\n  \"rows\": [\n    {\n      \"rank_no\": 1,\n      \"sku\": \"SOFA-GRAY-L\",\n      \"product\": \"Sofa góc hiện đại màu xám\",\n      \"category\": \"Sofa\",\n      \"brand\": \"MOHO\",\n      \"units\": 500000,\n      \"orders\": 250000,\n      \"revenue\": 40000000000,\n      \"avg_price\": 80000,\n      \"revenue_share\": 0.8,\n      \"cum_share\": 0.8,\n      \"abc_class\": \"A\"\n    },\n    {\n      \"rank_no\": 2,\n      \"sku\": \"BAN-SOI-6\",\n      \"product\": \"Bàn ăn gỗ sồi 6 ghế\",\n      \"category\": \"Bàn ăn\",\n      \"brand\": \"The House\",\n      \"units\": 75000,\n      \"orders\": 75000,\n      \"revenue\": 7500000000,\n      \"avg_price\": 100000,\n      \"revenue_share\": 0.15,\n      \"cum_share\": 0.95,\n      \"abc_class\": \"B\"\n    },\n    {\n      \"rank_no\": 3,\n      \"sku\": \"SOFA-GRAY-M\",\n      \"product\": \"Sofa góc hiện đại màu xám\",\n      \"category\": \"Sofa\",\n      \"brand\": \"MOHO\",\n      \"units\": 25000,\n      \"orders\": 25000,\n      \"revenue\": 2500000000,\n      \"avg_price\": 100000,\n      \"revenue_share\": 0.05,\n      \"cum_share\": 1.0,\n      \"abc_class\": \"C\"\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Tổng\",\n    \"total\": 3,\n    \"sums\": {\n      \"units\": 600000,\n      \"revenue\": 50000000000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "5. Report Data - Sản phẩm đang giảm giá",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/products-on-sale?from=2026-01-01&to=2026-12-31&basis=PAID",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "products-on-sale"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "categoryId",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "brandId",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "q",
+              "value": "",
+              "description": "Optional: Tìm kiếm",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Sản phẩm đang có giá sale, kèm số lượng bán trong kỳ"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/products-on-sale?from=2026-01-01&to=2026-12-31&basis=PAID",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "products-on-sale"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "basis",
+              "value": "PAID"
+            }
+          ]
+        }
+      },
+      "status": "OK",
+      "code": 200,
+      "_postman_previewlanguage": "json",
+      "header": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": "{\n  \"total\": 2,\n  \"rows\": [\n    {\n      \"sku\": \"SOFA-GRAY-L\",\n      \"product\": \"Sofa góc hiện đại màu xám\",\n      \"category\": \"Sofa\",\n      \"brand\": \"MOHO\",\n      \"list_price\": 18900000,\n      \"sale_price\": 15900000,\n      \"discount_rate\": 0.16,\n      \"stock\": 7,\n      \"units_sold\": 150000,\n      \"revenue\": 12000000000\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Tổng\",\n    \"total\": 2,\n    \"sums\": {\n      \"stock\": 22,\n      \"revenue\": 12000000000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "6. Report Data - Hàng chậm luân chuyển",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/slow-products?from=2026-01-01&to=2026-12-31&basis=PAID&maxUnits=0",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "slow-products"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "maxUnits",
+              "value": "0",
+              "description": "Ngưỡng số lượng bán (default 0 = không bán được)"
+            },
+            {
+              "key": "categoryId",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "brandId",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "q",
+              "value": "",
+              "description": "Optional: Tìm kiếm",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Sản phẩm còn tồn kho nhưng bán ít trong kỳ"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/slow-products?from=2026-01-01&to=2026-12-31&basis=PAID&maxUnits=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "slow-products"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "maxUnits",
+              "value": "0"
+            }
+          ]
+        }
+      },
+      "status": "OK",
+      "code": 200,
+      "_postman_previewlanguage": "json",
+      "header": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": "{\n  \"total\": 1,\n  \"rows\": [\n    {\n      \"sku\": \"GIUONG-SOI-1M6\",\n      \"product\": \"Giường ngủ gỗ sồi 1m6\",\n      \"category\": \"Giường ngủ\",\n      \"brand\": \"MOHO\",\n      \"stock\": 15,\n      \"unit_price\": 8500000,\n      \"stock_value\": 127500000,\n      \"units_sold\": 0\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Tổng\",\n    \"total\": 1,\n    \"sums\": {\n      \"stock\": 15,\n      \"stock_value\": 127500000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "7. Report Data - Doanh thu theo danh mục/thương hiệu",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/revenue-by-dimension?from=2026-01-01&to=2026-12-31&basis=PAID&dimension=category",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "revenue-by-dimension"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "dimension",
+              "value": "category",
+              "description": "category hoặc brand"
+            },
+            {
+              "key": "paymentMethod",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "city",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "q",
+              "value": "",
+              "description": "Optional: Tìm kiếm theo tên",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Cơ cấu doanh thu theo danh mục hoặc thương hiệu"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/revenue-by-dimension?from=2026-01-01&to=2026-12-31&basis=PAID&dimension=category",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "revenue-by-dimension"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "basis",
+                  "value": "PAID"
+                },
+                {
+                  "key": "dimension",
+                  "value": "category"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"total\": 4,\n  \"rows\": [\n    {\n      \"name\": \"Sofa\",\n      \"units\": 2000000,\n      \"orders\": 500000,\n      \"revenue\": 40000000000,\n      \"revenue_share\": 0.8\n    },\n    {\n      \"name\": \"Bàn ăn\",\n      \"units\": 750000,\n      \"orders\": 250000,\n      \"revenue\": 7500000000,\n      \"revenue_share\": 0.15\n    },\n    {\n      \"name\": \"Giường ngủ\",\n      \"units\": 250000,\n      \"orders\": 250000,\n      \"revenue\": 2500000000,\n      \"revenue_share\": 0.05\n    },\n    {\n      \"name\": \"Chưa phân loại\",\n      \"units\": 0,\n      \"orders\": 0,\n      \"revenue\": 0,\n      \"revenue_share\": 0\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Tổng\",\n    \"total\": 4,\n    \"sums\": {\n      \"units\": 3000000,\n      \"revenue\": 50000000000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "8. Report Data - Doanh thu theo phương thức thanh toán",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/revenue-by-payment-method?from=2026-01-01&to=2026-12-31&basis=PAID",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "revenue-by-payment-method"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "city",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Doanh thu thuần theo từng phương thức thanh toán"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/revenue-by-payment-method?from=2026-01-01&to=2026-12-31&basis=PAID",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "revenue-by-payment-method"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "basis",
+                  "value": "PAID"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"total\": 3,\n  \"rows\": [\n    {\n      \"payment_method\": \"COD\",\n      \"orders\": 333333,\n      \"net_revenue\": 33333333333,\n      \"aov\": 100000,\n      \"revenue_share\": 0.33\n    },\n    {\n      \"payment_method\": \"BANK_TRANSFER\",\n      \"orders\": 333333,\n      \"net_revenue\": 33333333333,\n      \"aov\": 100000,\n      \"revenue_share\": 0.33\n    },\n    {\n      \"payment_method\": \"SEPAY_BANK_TRANSFER\",\n      \"orders\": 333334,\n      \"net_revenue\": 33333333334,\n      \"aov\": 100000,\n      \"revenue_share\": 0.34\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Tổng\",\n    \"total\": 3,\n    \"sums\": {\n      \"orders\": 1000000,\n      \"net_revenue\": 100000000000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "9. Report Data - Doanh thu theo khu vực",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/revenue-by-region?from=2026-01-01&to=2026-12-31&basis=PAID",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "revenue-by-region"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "paymentMethod",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Doanh thu thuần theo tỉnh/thành giao hàng"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/revenue-by-region?from=2026-01-01&to=2026-12-31&basis=PAID",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "revenue-by-region"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "basis",
+                  "value": "PAID"
+            }
+          ]
+        }
+      },
+      "status": "OK",
+      "code": 200,
+      "_postman_previewlanguage": "json",
+      "header": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": "{\n  \"total\": 5,\n  \"rows\": [\n    {\n      \"city\": \"Hà Nội\",\n      \"orders\": 200000,\n      \"customers\": 150000,\n      \"net_revenue\": 20000000000,\n      \"aov\": 100000,\n      \"revenue_share\": 0.2\n    },\n    {\n      \"city\": \"TP.HCM\",\n      \"orders\": 300000,\n      \"customers\": 220000,\n      \"net_revenue\": 30000000000,\n      \"aov\": 100000,\n      \"revenue_share\": 0.3\n    },\n    {\n      \"city\": \"Đà Nẵng\",\n      \"orders\": 150000,\n      \"customers\": 100000,\n      \"net_revenue\": 15000000000,\n      \"aov\": 100000,\n      \"revenue_share\": 0.15\n    },\n    {\n      \"city\": \"Cần Thơ\",\n      \"orders\": 200000,\n      \"customers\": 150000,\n      \"net_revenue\": 20000000000,\n      \"aov\": 100000,\n      \"revenue_share\": 0.2\n    },\n    {\n      \"city\": \"Hải Phòng\",\n      \"orders\": 150000,\n      \"customers\": 100000,\n      \"net_revenue\": 15000000000,\n      \"aov\": 100000,\n      \"revenue_share\": 0.15\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Tổng\",\n    \"total\": 5,\n    \"sums\": {\n      \"orders\": 1000000,\n      \"net_revenue\": 100000000000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "10. Report Data - Khách hàng giá trị cao",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/top-customers?from=2026-01-01&to=2026-12-31&basis=PAID",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "top-customers"],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            },
+            {
+              "key": "basis",
+              "value": "PAID"
+            },
+            {
+              "key": "paymentMethod",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "city",
+              "value": "",
+              "description": "Optional",
+              "disabled": true
+            },
+            {
+              "key": "q",
+              "value": "",
+              "description": "Optional: Tìm kiếm theo tên/SĐT/email",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "description": "Xếp hạng khách hàng theo doanh thu thuần trong kỳ"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/top-customers?from=2026-01-01&to=2026-12-31&basis=PAID",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "top-customers"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "basis",
+              "value": "PAID"
+            }
+          ]
+        }
+      },
+      "status": "OK",
+      "code": 200,
+      "_postman_previewlanguage": "json",
+      "header": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": "{\n  \"total\": 1000000,\n  \"rows\": [\n    {\n      \"rank_no\": 1,\n      \"customer_type\": \"Khách vãng lai\",\n      \"customer_name\": \"Khách 1\",\n      \"phone\": \"0900000001\",\n      \"email\": null,\n      \"orders\": 3,\n      \"net_revenue\": 1500000,\n      \"aov\": 500000,\n      \"first_order\": \"2026-03-10\",\n      \"last_order\": \"2026-11-15\"\n    }\n  ],\n  \"summary\": {\n    \"totalLabel\": \"Tổng\",\n    \"total\": 1000000,\n    \"sums\": {\n      \"orders\": 1000000,\n      \"net_revenue\": 100000000000\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "11. Export CSV - Bảng kê chi tiết",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"from\": \"2026-01-01\",\n  \"to\": \"2026-12-31\",\n  \"basis\": \"PAID\",\n  \"format\": \"csv\",\n  \"delimiter\": \",\",\n  \"headers\": \"label\",\n  \"gzip\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/order-lines/export",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "order-lines", "export"]
+        },
+        "description": "Xuất báo cáo ra file CSV (sync mode cho dữ liệu nhỏ, async cho dữ liệu lớn)"
+      },
+      "response": [
+        {
+          "name": "Success - Sync Mode (dữ liệu nhỏ)",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"2026-01-01\",\n  \"to\": \"2026-12-31\",\n  \"basis\": \"PAID\",\n  \"format\": \"csv\",\n  \"delimiter\": \",\",\n  \"headers\": \"label\",\n  \"gzip\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/order-lines/export",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "order-lines", "export"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "text",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "text/csv"
+            },
+            {
+              "key": "Content-Disposition",
+              "value": "attachment; filename=\"order-lines_2026-01-01_to_2026-12-31.csv\""
+            }
+          ],
+          "body": "Mã đơn,Ngày đặt,Ngày thu tiền,Trạng thái đơn,Trạng thái TT,Phương thức TT,Khách hàng,Số điện thoại,Tỉnh/Thành,Quận/Huyện,SKU,Sản phẩm,Danh mục,Thương hiệu,Số lượng,Đơn giá (VND),Thành tiền (VND),Tổng đơn (VND)\nBENCH1,2026-03-10 12:00:00,2026-03-10 12:05:00,DELIVERED,PAID,COD,Nguyễn Văn A,0901234567,Hà Nội,Cầu Giấy,SOFA-GRAY-L,Sofa góc hiện đại màu xám,Sofa,MOHO,2,250000,500000,530000\n..."
+        },
+        {
+          "name": "Success - Async Mode (dữ liệu lớn)",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"2026-01-01\",\n  \"to\": \"2026-12-31\",\n  \"basis\": \"PAID\",\n  \"format\": \"csv\",\n  \"delimiter\": \",\",\n  \"headers\": \"label\",\n  \"gzip\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/order-lines/export",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "order-lines", "export"]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"mode\": \"async\",\n  \"exportId\": \"550e8400-e29b-41d4-a716-446655440000\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "12. Export XLSX - Bảng kê chi tiết",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"from\": \"2026-01-01\",\n  \"to\": \"2026-12-31\",\n  \"basis\": \"PAID\",\n  \"format\": \"xlsx\",\n  \"delimiter\": \",\",\n  \"headers\": \"label\",\n  \"gzip\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/order-lines/export",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "order-lines", "export"]
+        },
+        "description": "Xuất báo cáo ra file Excel với 2 sheet (Tổng quan + Dữ liệu)"
+      },
+      "response": [
+        {
+          "name": "Success - Sync Mode",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+              "value": "application/json"
+            }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"2026-01-01\",\n  \"to\": \"2026-12-31\",\n  \"basis\": \"PAID\",\n  \"format\": \"xlsx\",\n  \"delimiter\": \",\",\n  \"headers\": \"label\",\n  \"gzip\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/order-lines/export",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "order-lines", "export"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "binary",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            },
+            {
+              "key": "Content-Disposition",
+              "value": "attachment; filename=\"order-lines_2026-01-01_to_2026-12-31.xlsx\""
+            }
+          ],
+          "body": "[Binary file content]"
+        }
+      ]
+    },
+    {
+      "name": "13. Export History - Lịch sử export",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/exports",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "exports"]
+        },
+        "description": "Lấy lịch sử các export của user hiện tại"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/exports",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "exports"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "[\n  {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"reportId\": \"order-lines\",\n    \"format\": \"csv\",\n    \"status\": \"DONE\",\n    \"rowCount\": 3000000,\n    \"fileSize\": 150000000,\n    \"createdAt\": \"2026-11-18T14:00:00Z\",\n    \"startedAt\": \"2026-11-18T14:00:01Z\",\n    \"finishedAt\": \"2026-11-18T14:05:00Z\",\n    \"expiresAt\": \"2026-11-25T14:05:00Z\"\n  }\n]"
+        }
+      ]
+    },
+    {
+      "name": "14. Export Status - Trạng thái export",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/exports/{{exportId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "exports", "{{exportId}}"]
+        },
+        "description": "Kiểm tra trạng thái của một export (set exportId ở variables)"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/exports/550e8400-e29b-41d4-a716-446655440000",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "exports", "550e8400-e29b-41d4-a716-446655440000"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"reportId\": \"order-lines\",\n  \"format\": \"csv\",\n  \"status\": \"DONE\",\n  \"rowCount\": 3000000,\n  \"fileSize\": 150000000,\n  \"createdAt\": \"2026-11-18T14:00:00Z\",\n  \"startedAt\": \"2026-11-18T14:00:01Z\",\n  \"finishedAt\": \"2026-11-18T14:05:00Z\",\n  \"expiresAt\": \"2026-11-25T14:05:00Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "15. Export Link - Lấy link download",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/exports/{{exportId}}/link",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "exports", "{{exportId}}", "link"]
+        },
+        "description": "Lấy link download public cho file export (set exportId ở variables)"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/exports/550e8400-e29b-41d4-a716-446655440000/link",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "exports", "550e8400-e29b-41d4-a716-446655440000", "link"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"url\": \"/admin/reports/exports/download?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "16. Download File - Tải file export",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/reports/exports/download?token={{downloadToken}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "reports", "exports", "download"],
+          "query": [
+            {
+              "key": "token",
+              "value": "{{downloadToken}}",
+              "description": "Token từ response của API link"
+            }
+          ]
+        },
+        "description": "Tải file export bằng token (public endpoint, không cần auth)"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports/exports/download?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "reports", "exports", "download"],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "text",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "text/csv"
+            },
+            {
+              "key": "Content-Disposition",
+              "value": "attachment; filename=\"order-lines_2026-01-01_to_2026-12-31.csv\""
+            }
+          ],
+          "body": "Mã đơn,Ngày đặt,Ngày thu tiền,Trạng thái đơn,Trạng thái TT,Phương thức TT,Khách hàng,Số điện thoại,Tỉnh/Thành,Quận/Huyện,SKU,Sản phẩm,Danh mục,Thương hiệu,Số lượng,Đơn giá (VND),Thành tiền (VND),Tổng đơn (VND)\nBENCH1,2026-03-10 12:00:00,2026-03-10 12:05:00,DELIVERED,PAID,COD,Nguyễn Văn A,0901234567,Hà Nội,Cầu Giấy,SOFA-GRAY-L,Sofa góc hiện đại màu xám,Sofa,MOHO,2,250000,500000,530000\n..."
+        }
+      ]
+    }
+  ]
+}

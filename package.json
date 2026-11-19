@@ -28,7 +28,16 @@
     "prisma:reset": "prisma migrate reset",
     "prisma:push": "prisma db push",
     "prisma:format": "prisma format",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:seed:test": "dotenv -e .env.test -- tsx prisma/seed-test.ts",
+    "prisma:seed:bench": "dotenv -e .env.test -- tsx prisma/seed-bench.ts",
+    "db:test:create": "psql -U furniture -d postgres -c \"CREATE DATABASE furniture_test_db;\"",
+    "db:test:drop": "psql -U furniture -d postgres -c \"DROP DATABASE IF EXISTS furniture_test_db;\"",
+    "db:test:migrate": "dotenv -e .env.test -- prisma migrate deploy",
+    "db:test:reset": "dotenv -e .env.test -- prisma migrate reset",
+    "test:integration": "dotenv -e .env.test -- vitest run test/integration",
+    "test:integration:watch": "dotenv -e .env.test -- vitest test/integration",
+    "test:bench": "dotenv -e .env.test -- vitest run test/integration/report-bench.int-spec.ts"
   },
   "dependencies": {
     "@keyv/redis": "^6.1.0",
@@ -57,6 +66,7 @@
     "class-validator": "^0.15.1",
     "cloudinary": "^2.11.0",
     "compression": "^1.8.2",
+    "exceljs": "^4.4.0",
     "helmet": "^8.3.0",
     "ioredis": "^6.0.0",
     "joi": "^18.3.0",
@@ -98,6 +108,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^4.1.2",
+    "dotenv-cli": "^8.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.7",
     "jest": "^30.5.2",

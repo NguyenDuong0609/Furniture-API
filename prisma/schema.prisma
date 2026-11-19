@@ -219,7 +219,10 @@ model Order {
   payments         Payment[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+  paidAt DateTime?
 
+  @@index([paidAt, id])       // báo cáo theo ngày thu tiền + phân trang keyset
+  @@index([createdAt, id])    // báo cáo theo ngày đặt hàng + phân trang keyset
   @@index([userId, status])
   @@index([paymentStatus, createdAt])
   @@index([createdAt])
@@ -348,6 +351,8 @@ model OrderItem {
   quantity  Int
   price     Decimal         // Giá tại thời điểm đặt hàng
   name      String          // Snapshot tên sản phẩm
+  @@index([orderId])          // PostgreSQL KHÔNG tự tạo index cho khóa ngoại; thiếu index này thì join chậm khi lên triệu dòng
+  @@index([productId])
 }
 
 // ==================== KHÁC ====================
@@ -458,4 +463,34 @@ model EmailOutbox {
   updatedAt     DateTime    @updatedAt
 
   @@index([status, nextAttemptAt])
+}
+
+enum ReportExportStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+  EXPIRED
+}
+
+model ReportExport {
+  id         String             @id @default(uuid())
+  userId     Int
+  reportId   String
+  format     String                          // csv | xlsx
+  filters    Json
+  options    Json?
+  includePii Boolean            @default(false)
+  status     ReportExportStatus @default(QUEUED)
+  rowCount   Int?
+  fileSize   Int?
+  filePath   String?
+  error      String?
+  createdAt  DateTime           @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+  expiresAt  DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }

@@ -42,6 +42,7 @@ import { HealthController } from './health/health.controller.js';
 import { CouponsModule } from './coupons/coupons.module.js';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MailModule } from './mail/mail.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -147,6 +148,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     AddressesModule,
     CouponsModule,
     MailModule,
+    ReportsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [

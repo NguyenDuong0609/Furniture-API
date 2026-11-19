@@ -2,6 +2,7 @@
 /dist
 /node_modules
 .pnpm-store
+/exports
 
 # Logs
 logs
@@ -37,6 +38,7 @@ lerna-debug.log*
 .env
 .env.local
 .env.*.local
+.env.test
 
 # Database
 *.db
