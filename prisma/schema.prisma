@@ -353,6 +353,7 @@ model OrderItem {
   name      String          // Snapshot tên sản phẩm
   @@index([orderId])          // PostgreSQL KHÔNG tự tạo index cho khóa ngoại; thiếu index này thì join chậm khi lên triệu dòng
   @@index([productId])
+  @@index([productId, orderId])     // có thể xóa @@index([productId]) cũ vì index này đã bao gồm
 }
 
 // ==================== KHÁC ====================

@@ -1,12 +1,12 @@
-import { Prisma } from '@prisma/client';
-import type { Col, ColType, Cursor, Filters, ReportDef } from './report-types.js';
+﻿import { Prisma } from '@prisma/client';
+import type { AdvCond, Col, ColType, Cursor, Filters, ReportDef } from './report-types.js';
 import {
   ITEM_FROM, and, catBrandConds, dc, itemConds, labelSql, likeEscape, local, orderConds, range, raw,
 } from './report-sql.js';
+import { advBy } from './export/report-advanced.js';
 
 const C = (key: string, header: string, type: ColType, extra: Partial<Col> = {}): Col => ({ key, header, type, ...extra });
 const SUM = { total: 'sum' } as const;
-const catBrand = (f: Filters) => catBrandConds(f).map((c) => Prisma.sql`AND ${c}`);
 const withAnd = (parts: Prisma.Sql[]) => (parts.length ? Prisma.sql`AND ${and(parts)}` : Prisma.empty);
 
 // ---- Báo cáo chi tiết: đọc theo lô đơn hàng, phân trang keyset (ngày, id) ----
@@ -28,6 +28,12 @@ const orderLines: ReportDef = {
   id: 'order-lines', group: 'Chi tiết', title: 'Bảng kê chi tiết bán hàng',
   description: 'Mỗi dòng là một sản phẩm của một đơn hàng. Dùng để đối soát và phân tích sâu; xuất được hàng triệu dòng.',
   filters: ['basis', 'status', 'paymentMethod', 'city', 'categoryId', 'brandId'],
+  advanced: [
+    { key: 'order_code', label: 'Mã đơn', kind: 'text', level: 'order', sql: 'o2.code' },
+    { key: 'sku',        label: 'SKU',    kind: 'text', level: 'line',  sql: 'p.sku' },
+    { key: 'quantity',   label: 'Số lượng', kind: 'number', level: 'line', sql: 'oi.quantity' },
+    { key: 'unit_price', label: 'Đơn giá', kind: 'number', level: 'line', sql: 'oi.price' },
+  ],
   columns: [
     C('order_code', 'Mã đơn', 'text', { width: 22 }),
     C('order_date', 'Ngày đặt', 'datetime', { width: 19 }),
@@ -56,9 +62,14 @@ const orderLines: ReportDef = {
   ],
   detail: {
     totalLabel: 'Số đơn hàng',
-    batch: (f, cur: Cursor | null, orders) => {
+    batch: (f, cur: Cursor | null, orders, adv) => {
       const col = f.basis === 'PAID' ? '"paidAt"' : '"createdAt"';
       const conds = lineConds(f);
+      conds.push(...advBy(adv, 'order'));
+      const lineAdv = advBy(adv, 'line');
+      if (lineAdv.length) {
+        conds.push(Prisma.sql`EXISTS (SELECT 1 FROM "OrderItem" oi JOIN "Product" p ON p.id = oi."productId" WHERE oi."orderId" = o2.id ${withAnd(lineAdv)})`);
+      }
       if (cur) conds.push(Prisma.sql`(${raw(`o2.${col}`)}, o2.id) > (${cur.ts}::timestamp, ${cur.id})`);
       return Prisma.sql`
         SELECT o.id AS order_id, o.code AS order_code,
@@ -76,18 +87,22 @@ const orderLines: ReportDef = {
         JOIN "Product" p ON p.id = oi."productId"
         LEFT JOIN "Category" c ON c.id = p."categoryId"
         LEFT JOIN "Brand" b ON b.id = p."brandId"
-        WHERE TRUE ${withAnd(catBrandConds(f))}
+        WHERE TRUE ${withAnd(catBrandConds(f))} ${withAnd(advBy(adv, 'line'))}
         ORDER BY ${raw(`o.${col}`)}, o.id, oi.id`;
     },
-    summary: (f) => Prisma.sql`
+    summary: (f, adv) => Prisma.sql`
       SELECT COUNT(DISTINCT o2.id)::int AS total, COALESCE(SUM(oi.quantity), 0)::int AS quantity,
              COALESCE(SUM(oi.price * oi.quantity), 0) AS line_total
       FROM "Order" o2
       JOIN "OrderItem" oi ON oi."orderId" = o2.id
       JOIN "Product" p ON p.id = oi."productId"
-      WHERE ${and(lineConds(f))} ${withAnd(catBrandConds(f))}`,
-    countCapped: (f, cap) => Prisma.sql`
-      SELECT COUNT(*)::int AS n FROM (SELECT 1 FROM "Order" o2 WHERE ${and(lineConds(f))} LIMIT ${cap + 1}) t`,
+      WHERE ${and(lineConds(f))} ${withAnd(catBrandConds(f))} ${withAnd(advBy(adv, 'order'))} ${withAnd(advBy(adv, 'line'))}`,
+    countCapped: (f, cap, adv) => {
+      const cc = [...lineConds(f), ...advBy(adv, 'order')];
+      const la = advBy(adv, 'line');
+      if (la.length) cc.push(Prisma.sql`EXISTS (SELECT 1 FROM "OrderItem" oi JOIN "Product" p ON p.id = oi."productId" WHERE oi."orderId" = o2.id ${withAnd(la)})`);
+      return Prisma.sql`SELECT COUNT(*)::int AS n FROM (SELECT 1 FROM "Order" o2 WHERE ${and(cc)} LIMIT ${cap + 1}) t`;
+    },
   },
 };
 
@@ -140,6 +155,7 @@ const topProducts: ReportDef = {
   description: 'Xếp hạng sản phẩm theo số lượng hoặc doanh thu, kèm phân loại ABC (Pareto).',
   filters: ['basis', 'categoryId', 'brandId', 'paymentMethod', 'city', 'metric'],
   searchCols: ['product', 'sku', 'category', 'brand'],
+  advanced: [{ key: 'abc_class', label: 'Nhóm ABC', kind: 'enum', options: ['A', 'B', 'C'], level: 'result' }],
   columns: [
     C('rank_no', 'Hạng', 'int', { width: 8 }), C('sku', 'SKU', 'text', { width: 16 }),
     C('product', 'Sản phẩm', 'text', { width: 38 }), C('category', 'Danh mục', 'text', { width: 20 }),
@@ -211,7 +227,7 @@ const productsOnSale: ReportDef = {
       FROM "OrderItem" oi JOIN "Order" o ON o.id = oi."orderId"
       WHERE ${and(orderConds(f))} GROUP BY oi."productId"
     ) s ON s."productId" = p.id
-    WHERE p."salePrice" IS NOT NULL AND p."isActive" = true ${Prisma.join(catBrand(f), ' ', ' ')}`,
+    WHERE p."salePrice" IS NOT NULL AND p."isActive" = true ${withAnd(catBrandConds(f))}`,
 };
 
 const slowProducts: ReportDef = {
@@ -244,7 +260,7 @@ const slowProducts: ReportDef = {
       WHERE ${and(orderConds(f))} GROUP BY oi."productId"
     ) s ON s."productId" = p.id
     WHERE p."isActive" = true AND p.stock > 0 AND COALESCE(s.units, 0) <= ${f.maxUnits}
-          ${Prisma.join(catBrand(f), ' ', ' ')}`,
+          ${withAnd(catBrandConds(f))}`,
 };
 
 const byDimension: ReportDef = {

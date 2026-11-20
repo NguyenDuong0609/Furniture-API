@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "nestjs-ecommerce",
   "version": "0.0.1",
   "description": "",
@@ -35,9 +35,9 @@
     "db:test:drop": "psql -U furniture -d postgres -c \"DROP DATABASE IF EXISTS furniture_test_db;\"",
     "db:test:migrate": "dotenv -e .env.test -- prisma migrate deploy",
     "db:test:reset": "dotenv -e .env.test -- prisma migrate reset",
-    "test:integration": "dotenv -e .env.test -- vitest run test/integration",
-    "test:integration:watch": "dotenv -e .env.test -- vitest test/integration",
-    "test:bench": "dotenv -e .env.test -- vitest run test/integration/report-bench.int-spec.ts"
+    "test:integration": "dotenv -e .env.test -- vitest run --config ./vitest.config.integration.ts",
+    "test:integration:watch": "dotenv -e .env.test -- vitest --config ./vitest.config.integration.ts",
+    "test:bench": "dotenv -e .env.test -- vitest run --config ./vitest.config.bench.ts"
   },
   "dependencies": {
     "@keyv/redis": "^6.1.0",

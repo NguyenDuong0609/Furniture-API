@@ -27,6 +27,8 @@ export const BaseFilters = z.object({
   dimension: z.enum(['category', 'brand']).default('category'),
   maxUnits: z.coerce.number().int().min(0).default(0),
   q: z.string().trim().max(100).optional(),
+  // Bộ lọc nâng cao theo cột: chuỗi JSON (GET) hoặc object (POST). Được kiểm tra chi tiết trong report-advanced.ts
+  adv: z.union([z.string().max(4000), z.record(z.string().max(40), z.unknown())]).optional(),
   sortBy: z.string().max(40).optional(),
   sortDir: z.enum(['asc', 'desc']).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -43,17 +45,33 @@ export type FilterKey =
 
 export interface Cursor { ts: string; id: number }
 
+// ---- Bộ lọc nâng cao theo cột ----
+export type AdvKind = 'text' | 'number' | 'enum';
+export interface AdvSpec {
+  key: string;                         // khóa trong `adv`, thường trùng key của cột
+  label: string; kind: AdvKind;
+  level: 'result' | 'order' | 'line';  // result: sau tổng hợp · order/line: trong truy vấn chi tiết
+  options?: string[];                  // kind = enum
+  unit?: string;                       // hiển thị: VND, %, SL
+  percent?: boolean;                   // cột tỷ lệ: API dùng 0–1, UI hiển thị %
+  sql?: string;                        // level order/line: biểu thức cột SQL đích (hằng số do server khai báo)
+  pii?: boolean;                       // cần quyền report:pii
+}
+export interface AdvCond { spec: AdvSpec; contains?: string; min?: number; max?: number; in?: string[] }
+
 export interface ReportDef {
   id: string; title: string; description: string; group: string;
   columns: Col[]; filters: FilterKey[];
-  searchCols?: string[];                 // cột được tìm kiếm (báo cáo tổng hợp)
+  searchCols?: string[];                 // cột được tìm kiếm nhanh (báo cáo tổng hợp)
+  advanced?: AdvSpec[];                  // ghi đè/bổ sung bộ lọc nâng cao (mặc định tự sinh từ cột)
+  advExclude?: string[];                 // cột không cho lọc nâng cao
   sortable: string[]; defaultSort: string; defaultDir: 'asc' | 'desc';
   notes: string[];                       // định nghĩa số liệu, in trong file Excel
   build?: (f: Filters) => Prisma.Sql;    // báo cáo tổng hợp
   detail?: {                             // báo cáo chi tiết: đọc theo lô, không giới hạn số dòng
     totalLabel: string;
-    batch: (f: Filters, cur: Cursor | null, orders: number) => Prisma.Sql;
-    summary: (f: Filters) => Prisma.Sql;
-    countCapped: (f: Filters, cap: number) => Prisma.Sql;
+    batch: (f: Filters, cur: Cursor | null, orders: number, adv: AdvCond[]) => Prisma.Sql;
+    summary: (f: Filters, adv: AdvCond[]) => Prisma.Sql;
+    countCapped: (f: Filters, cap: number, adv: AdvCond[]) => Prisma.Sql;
   };
 }

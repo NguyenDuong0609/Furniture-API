@@ -15,6 +15,7 @@ import { FiltersSchema, type Filters, type ReportDef } from '../report-types.js'
 import { ReportsService } from '../reports.service.js';
 import { writeCsv, type CsvOptions } from './csv-writer.js';
 import { writeXlsx } from './xlsx-writer.js';
+import { describeAdv } from './report-advanced.js';
 
 export interface ExportOptions extends CsvOptions { format: 'csv' | 'xlsx'; gzip: boolean }
 
@@ -45,23 +46,25 @@ export class ReportExportService {
     const active = await this.prisma.reportExport.count({ where: { userId, status: { in: ['QUEUED', 'RUNNING'] } } });
     if (active >= MAX_ACTIVE_PER_USER) throw new HttpException('Bạn đang có quá nhiều báo cáo đang xử lý, vui lòng đợi.', 429);
 
+    const includePii = await this.reports.hasPermission(userId, 'report:pii');
+    this.reports.resolveAdv(def, filters, includePii);      // báo lỗi 400/403 ngay, không để job nền thất bại sau đó
+
     // Luôn chạy async để lưu file
     const mode: 'sync' | 'async' = 'async';
 
-    // Validate XLSX max rows cho báo cáo detail
+    // Validate XLSX max rows cho báo cáo detail (đã tính cả bộ lọc nâng cao)
     if (def.detail && opts.format === 'xlsx') {
-      const [{ n }] = await this.prisma.$queryRaw<{ n: number }[]>(def.detail.countCapped(filters, XLSX_MAX_ROWS));
+      const n = await this.reports.countOrders(def, filters, XLSX_MAX_ROWS, includePii);
       if (n > XLSX_MAX_ROWS) {
         throw new BadRequestException('Dữ liệu quá lớn cho một file Excel. Hãy xuất CSV hoặc chia nhỏ theo khoảng thời gian.');
       }
     }
 
-    const includePii = await this.reports.hasPermission(userId, 'report:pii');
     const rec = await this.prisma.reportExport.create({
       data: {
         userId, reportId, format: opts.format, includePii,
         filters: filters as unknown as Prisma.InputJsonValue, options: opts as unknown as Prisma.InputJsonValue,
-        status: 'QUEUED',  // luôn QUEUED cho async
+        status: 'QUEUED',
         startedAt: null,
       },
     });
@@ -96,13 +99,14 @@ export class ReportExportService {
     if (opts.format === 'csv') return writeCsv(out, cols, counted(), opts);
 
     const [sum, user] = await Promise.all([
-      this.reports.summary(def, f),
+      this.reports.summary(def, f, rec.includePii),          // thêm tham số quyền
       this.prisma.user.findUnique({ where: { id: rec.userId }, select: { name: true, email: true } }),
     ]);
     const filterLines = Object.entries({
       'Danh mục (ID)': f.categoryId, 'Thương hiệu (ID)': f.brandId, 'Thanh toán': f.paymentMethod,
       'Tỉnh/Thành': f.city, 'Trạng thái đơn': f.status, 'Tìm kiếm': f.q,
     }).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}: ${v}`);
+    const advLines = describeAdv(this.reports.resolveAdv(def, f, rec.includePii)).map((s) => `Lọc cột: ${s}`);
     return writeXlsx(out, cols, counted(), {
       company: this.company, title: def.title, subtitle: def.description,
       period: `Từ ${f.from.split('-').reverse().join('/')} đến ${f.to.split('-').reverse().join('/')}`,

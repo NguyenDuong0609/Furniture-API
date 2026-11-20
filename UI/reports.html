@@ -5,73 +5,120 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Báo cáo</title>
 <style>
-  :root { --brand:#1f4e78; --line:#e3e7ef; --muted:#6b7385; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#1d2433; background:#f4f6fb; display:flex; min-height:100vh; }
-  aside { width:250px; background:#fff; border-right:1px solid var(--line); padding:16px; overflow:auto; }
-  aside h4 { margin:16px 0 6px; font-size:12px; text-transform:uppercase; color:var(--muted); }
-  aside button { display:block; width:100%; text-align:left; padding:8px 10px; border:0; background:none; border-radius:8px; cursor:pointer; font:inherit; }
-  aside button:hover { background:#eef3ff; } aside button.active { background:var(--brand); color:#fff; }
-  main { flex:1; padding:20px; min-width:0; }
-  .conn input { width:100%; margin-bottom:6px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; }
-  h2 { margin:0 0 4px; } .desc { color:var(--muted); margin:0 0 14px; }
-  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:12px; }
-  .bar label { display:block; font-size:12px; color:var(--muted); margin-bottom:2px; }
-  .bar input, .bar select { padding:6px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; min-width:120px; }
-  button.btn { padding:7px 14px; border:0; border-radius:8px; background:var(--brand); color:#fff; cursor:pointer; font:inherit; }
-  button.btn.ghost { background:#fff; color:var(--brand); border:1px solid var(--brand); }
-  button.btn:disabled { opacity:.5; cursor:not-allowed; }
-  .kpis { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
-  .kpi { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 14px; min-width:150px; }
-  .kpi small { color:var(--muted); display:block; } .kpi b { font-size:18px; }
-  .wrap { background:#fff; border:1px solid var(--line); border-radius:10px; overflow:auto; max-height:60vh; }
+  :root { --bg:#f5f7fb; --card:#fff; --ink:#1b2333; --muted:#6b7385; --line:#e6eaf2; --brand:#1f4e78; --brand2:#2e75b6; --soft:#eaf1fb; --ok:#16a34a; --err:#c0392b; --r:12px; --sh:0 1px 2px rgba(20,30,60,.05),0 6px 20px rgba(20,30,60,.06); }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); display:grid; grid-template-columns:264px 1fr; min-height:100vh; }
+  aside { background:var(--card); border-right:1px solid var(--line); padding:18px 14px; overflow:auto; position:sticky; top:0; height:100vh; }
+  .brand { font-weight:700; font-size:17px; color:var(--brand); margin:0 6px 14px; }
+  details.conn { margin:0 0 8px; } details.conn summary { cursor:pointer; color:var(--muted); font-size:12px; padding:4px 6px; }
+  .conn input { width:100%; margin:6px 0 0; padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-size:12px; }
+  aside h4 { margin:18px 6px 6px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .menu button { display:block; width:100%; text-align:left; padding:8px 10px; border:0; background:none; border-radius:8px; cursor:pointer; font:inherit; color:var(--ink); }
+  .menu button:hover { background:var(--soft); } .menu button.active { background:var(--brand); color:#fff; }
+  main { padding:22px 26px; min-width:0; }
+  h2 { margin:0; font-size:21px; } .desc { color:var(--muted); margin:2px 0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--sh); }
+  .filters { padding:14px 16px; margin-bottom:10px; }
+  .grid { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+  .field label, .grid > div > label { display:block; font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .field label em { font-style:normal; background:var(--soft); color:var(--brand); border-radius:6px; padding:0 6px; margin-left:4px; font-size:11px; }
+  input, select { padding:7px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; min-width:130px; color:var(--ink); }
+  input:focus, select:focus { outline:2px solid #bcd3f0; border-color:var(--brand2); }
+  .btn { padding:8px 16px; border:0; border-radius:9px; background:var(--brand); color:#fff; cursor:pointer; font:inherit; font-weight:600; }
+  .btn:hover { background:#17405f; } .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn.ghost { background:#fff; color:var(--brand); border:1px solid #c9d6e6; } .btn.ghost:hover { background:var(--soft); }
+  .badge { display:inline-block; min-width:20px; padding:0 6px; margin-left:6px; border-radius:10px; background:var(--brand2); color:#fff; font-size:11px; text-align:center; line-height:19px; }
+  .adv { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px 18px; margin-top:14px; padding-top:14px; border-top:1px dashed var(--line); }
+  .adv .field input { width:100%; } .range { display:flex; align-items:center; gap:6px; } .range input { min-width:0; } .range span { color:var(--muted); }
+  .adv-actions { grid-column:1/-1; display:flex; gap:8px; justify-content:flex-end; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { padding:5px 14px; border:1px solid #c9d6e6; background:#fff; color:var(--brand); border-radius:999px; cursor:pointer; font:inherit; }
+  .chip.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .tags { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px; min-height:0; }
+  .tag { display:inline-flex; align-items:center; gap:6px; background:var(--soft); color:var(--brand); border-radius:999px; padding:3px 6px 3px 12px; font-size:13px; }
+  .tag button { border:0; background:#fff; color:var(--brand); width:20px; height:20px; border-radius:50%; cursor:pointer; line-height:18px; padding:0; }
+  .link { border:0; background:none; color:var(--brand2); cursor:pointer; font:inherit; text-decoration:underline; }
+  .hint { font-size:12px; color:var(--muted); background:#fff8e6; border:1px solid #f3e0a8; border-radius:8px; padding:6px 10px; margin:0 0 10px; }
+  .kpis { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+  .kpi { padding:10px 16px; min-width:160px; } .kpi small { color:var(--muted); display:block; } .kpi b { font-size:19px; }
+  .tablecard { overflow:hidden; } .wrap { overflow:auto; max-height:58vh; }
   table { border-collapse:collapse; width:100%; }
-  th { position:sticky; top:0; background:var(--brand); color:#fff; padding:8px 10px; text-align:left; white-space:nowrap; cursor:pointer; user-select:none; }
-  th.nosort { cursor:default; } td { padding:7px 10px; border-top:1px solid var(--line); white-space:nowrap; }
-  td.n { text-align:right; font-variant-numeric:tabular-nums; } tr:hover td { background:#f8faff; }
-  .pager { display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap; }
-  .grow { flex:1; } .msg { color:var(--muted); } .err { color:#c0392b; }
-  .export { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  th { position:sticky; top:0; background:var(--brand); color:#fff; padding:9px 12px; text-align:left; white-space:nowrap; cursor:pointer; user-select:none; font-weight:600; }
+  th.nosort { cursor:default; } td { padding:8px 12px; border-top:1px solid var(--line); white-space:nowrap; }
+  tbody tr:nth-child(even) td { background:#fafbfe; } tbody tr:hover td { background:#eef4fc; }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .empty { text-align:center; color:var(--muted); padding:36px 0; }
+  .skel td { color:transparent; } .skel td::after { content:""; display:block; height:12px; border-radius:6px; background:linear-gradient(90deg,#eef1f7,#f7f9fc,#eef1f7); background-size:200% 100%; animation:sh 1.2s infinite; }
+  @keyframes sh { to { background-position:-200% 0; } }
+  .bottom { display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap; } .grow { flex:1; }
+  .msg { color:var(--muted); } .err { color:var(--err); }
+  .prog { height:3px; background:#dfe7f3; border-radius:3px; overflow:hidden; margin-top:8px; } .prog i { display:block; width:35%; height:100%; background:var(--brand2); animation:sl 1.1s ease-in-out infinite; }
+  @keyframes sl { 0% { margin-left:-35%; } 100% { margin-left:100%; } }
+  dialog { border:0; border-radius:var(--r); box-shadow:0 20px 60px rgba(0,0,0,.25); padding:0; width:min(680px,92vw); } dialog::backdrop { background:rgba(20,30,60,.4); }
+  dialog header { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid var(--line); font-weight:700; }
+  dialog .body { max-height:60vh; overflow:auto; padding:6px 18px 14px; }
+  .st { font-size:11px; border-radius:6px; padding:1px 8px; background:#eef1f7; } .st.DONE { background:#dcf5e5; color:var(--ok); } .st.FAILED { background:#fde4e1; color:var(--err); }
+  [hidden] { display:none !important; }
+  @media (max-width:900px) { body { grid-template-columns:1fr; } aside { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } main { padding:14px; } }
 </style>
 </head>
 <body>
 <aside>
-  <div class="conn">
+  <div class="brand">📊 Báo cáo</div>
+  <details class="conn" open>
+    <summary>Kết nối API</summary>
     <input id="api" placeholder="API base" />
     <input id="token" placeholder="JWT token (Bearer)" />
-    <button class="btn ghost" onclick="init()">Kết nối</button>
-  </div>
-  <div id="menu"></div>
+    <button class="btn ghost" style="margin-top:8px;width:100%" onclick="init()">Kết nối</button>
+  </details>
+  <div class="menu" id="menu"></div>
 </aside>
 <main>
   <h2 id="title">Chọn một báo cáo</h2>
-  <p class="desc" id="desc"></p>
-  <div class="bar" id="filters"></div>
+  <p class="desc" id="desc">Chọn báo cáo ở menu bên trái.</p>
+
+  <div class="card filters" id="filterCard" hidden>
+    <div class="grid" id="filters"></div>
+    <div id="advBox" hidden>
+      <div class="adv" id="adv" hidden></div>
+    </div>
+  </div>
+  <div class="tags" id="chips"></div>
+  <p class="hint" id="advHint" hidden>Hạng, tỷ trọng và nhóm ABC được tính trên toàn bộ dữ liệu trước khi lọc cột, nên các dòng còn lại có thể không cộng đủ 100%.</p>
+
   <div class="kpis" id="kpis"></div>
-  <div class="wrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
-  <div class="pager">
+  <div class="card tablecard"><div class="wrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></div>
+
+  <div class="bottom">
     <button class="btn ghost" id="prev" onclick="go(-1)">‹ Trước</button>
     <span id="pageInfo" class="msg"></span>
     <button class="btn ghost" id="next" onclick="go(1)">Sau ›</button>
     <span class="grow"></span>
-    <div class="export">
-      <select id="delim" title="Dấu phân cách CSV">
-        <option value=",">CSV dấu phẩy (,)</option>
-        <option value=";">CSV dấu chấm phẩy (;) — Excel tiếng Việt</option>
-        <option value="&#9;">CSV Tab</option>
-      </select>
-      <label class="msg"><input type="checkbox" id="gzip" /> nén .gz</label>
-      <button class="btn" onclick="doExport('xlsx')">Xuất Excel</button>
-      <button class="btn" onclick="doExport('csv')">Xuất CSV</button>
-    </div>
+    <select id="delim" title="Dấu phân cách CSV">
+      <option value=",">CSV dấu phẩy (,)</option>
+      <option value=";">CSV dấu chấm phẩy (;) — Excel tiếng Việt</option>
+      <option value="&#9;">CSV Tab</option>
+    </select>
+    <label class="msg"><input type="checkbox" id="gzip" style="min-width:0" /> nén .gz</label>
+    <button class="btn" onclick="doExport('xlsx')">Xuất Excel</button>
+    <button class="btn" onclick="doExport('csv')">Xuất CSV</button>
+    <button class="btn ghost" onclick="openHistory()">Lịch sử export</button>
   </div>
+  <div class="prog" id="prog" hidden><i></i></div>
   <p id="status" class="msg"></p>
 </main>
 
+<dialog id="hist">
+  <header><span>Lịch sử export</span><button class="btn ghost" onclick="$('#hist').close()">Đóng</button></header>
+  <div class="body" id="histBody"></div>
+</dialog>
+
 <script>
-const $ = (s) => document.querySelector(s);
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const unwrap = (j) => (j && j.data !== undefined && !Array.isArray(j) ? j.data : j);
-const money = new Intl.NumberFormat('vi-VN');
+const nf = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 let API, TOKEN, catalog, def, page = 1, sortBy = null, sortDir = null, cursors = [null], cur = 0, nextCursor = null;
 
 $('#api').value = localStorage.getItem('api') || 'http://localhost:3000';
@@ -80,11 +127,13 @@ $('#token').value = localStorage.getItem('token') || '';
 const authHeaders = (json) => ({ ...(json ? { 'Content-Type': 'application/json' } : {}), Authorization: 'Bearer ' + TOKEN });
 async function call(path, opts = {}) {
   const res = await fetch(API + path, { ...opts, headers: { ...authHeaders(!!opts.body), ...(opts.headers || {}) } });
-  if (!res.ok) { let m = res.statusText; try { const j = await res.json(); m = j.message || JSON.stringify(j); } catch {} throw new Error(m); }
+  if (!res.ok) { let m = res.statusText; try { const j = await res.json(); m = Array.isArray(j.message) ? j.message.join('; ') : (j.message || JSON.stringify(j)); } catch {} throw new Error(m); }
   return res;
 }
 const api = async (path, opts) => unwrap(await (await call(path, opts)).json());
+function say(t, err) { const s = $('#status'); s.textContent = t; s.className = err ? 'err' : 'msg'; }
 
+// ---------- Kết nối + menu ----------
 async function init() {
   API = $('#api').value.trim(); TOKEN = $('#token').value.trim();
   localStorage.setItem('api', API); localStorage.setItem('token', TOKEN);
@@ -92,17 +141,23 @@ async function init() {
   const groups = {};
   catalog.reports.forEach((r) => (groups[r.group] ??= []).push(r));
   $('#menu').innerHTML = Object.entries(groups).map(([g, rs]) =>
-    `<h4>${g}</h4>` + rs.map((r) => `<button data-id="${r.id}" onclick="pick('${r.id}')">${r.title}</button>`).join('')).join('');
+    `<h4>${esc(g)}</h4>` + rs.map((r) => `<button data-id="${r.id}" onclick="pick('${r.id}')">${esc(r.title)}</button>`).join('')).join('');
   say('');
+  const p = new URLSearchParams(location.search);
+  if (p.get('r') && catalog.reports.some((r) => r.id === p.get('r'))) pick(p.get('r'), p);
 }
 
-function pick(id) {
+function pick(id, restoreParams) {
   def = catalog.reports.find((r) => r.id === id);
-  document.querySelectorAll('aside button[data-id]').forEach((b) => b.classList.toggle('active', b.dataset.id === id));
+  $$('.menu button').forEach((b) => b.classList.toggle('active', b.dataset.id === id));
   $('#title').textContent = def.title; $('#desc').textContent = def.description;
-  sortBy = null; sortDir = null; buildFilters(); reload(true);
+  sortBy = null; sortDir = null;
+  buildFilters(); buildAdvanced();
+  if (restoreParams) restore(restoreParams);
+  reload(true);
 }
 
+// ---------- Bộ lọc chung ----------
 const today = new Date();
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const PRESETS = {
@@ -120,7 +175,7 @@ const SELECTS = {
   dimension: ['Chiều', [['category', 'Danh mục'], ['brand', 'Thương hiệu']]],
 };
 function buildFilters() {
-  const opt = (arr) => arr.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+  const opt = (arr) => arr.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('');
   const L = catalog.lookups;
   let h = `<div><label>Từ ngày</label><input type="date" id="f_from"></div><div><label>Đến ngày</label><input type="date" id="f_to"></div>
     <div><label>Nhanh</label><select id="preset"><option value="">—</option><option value="thisMonth">Tháng này</option><option value="lastMonth">Tháng trước</option>
@@ -134,59 +189,138 @@ function buildFilters() {
     else if (k === 'city') h += `<div><label>Tỉnh/Thành</label><input id="f_city" placeholder="Hà Nội"></div>`;
     else if (k === 'maxUnits') h += `<div><label>Bán tối đa (SL)</label><input id="f_maxUnits" type="number" min="0" value="0"></div>`;
   }
-  if (def.searchable) h += `<div><label>Tìm kiếm</label><input id="f_q" placeholder="${def.detail ? 'Mã đơn hoặc SĐT' : 'Từ khóa'}"></div>`;
-  h += `<button class="btn" onclick="reload(true)">Áp dụng</button>`;
+  if (def.searchable) h += `<div><label>Tìm nhanh</label><input id="f_q" placeholder="${def.detail ? 'Mã đơn hoặc SĐT' : 'Từ khóa'}"></div>`;
+  const hasAdv = (def.advanced || []).length > 0;
+  if (hasAdv) h += `<button class="btn ghost" type="button" id="advToggle" onclick="toggleAdv()">⚙ Bộ lọc nâng cao <span class="badge" id="advCount" hidden>0</span></button>`;
+  h += `<button class="btn" type="button" onclick="reload(true)">Áp dụng</button>`;
   $('#filters').innerHTML = h;
+  $('#filterCard').hidden = false;
   const [a, b] = PRESETS.thisMonth(); $('#f_from').value = iso(a); $('#f_to').value = iso(b);
   $('#preset').onchange = (e) => { if (e.target.value) { const [x, y] = PRESETS[e.target.value](); $('#f_from').value = iso(x); $('#f_to').value = iso(y); reload(true); } };
-  $('#f_q')?.addEventListener('keydown', (e) => e.key === 'Enter' && reload(true));
+  $$('#filters input').forEach((i) => i.addEventListener('keydown', (e) => e.key === 'Enter' && reload(true)));
 }
-
 function filters() {
   const o = { from: $('#f_from').value, to: $('#f_to').value };
-  $('#filters').querySelectorAll('[id^="f_"]').forEach((el) => {
-    const k = el.id.slice(2);
-    if (!['from', 'to'].includes(k) && el.value !== '') o[k] = el.value;
-  });
+  $$('#filters [id^="f_"]').forEach((el) => { const k = el.id.slice(2); if (!['from', 'to'].includes(k) && el.value !== '') o[k] = el.value; });
   return o;
 }
 
+// ---------- Bộ lọc nâng cao (sinh từ metadata của server) ----------
+function buildAdvanced() {
+  const specs = def.advanced || [];
+  $('#advBox').hidden = !specs.length; $('#adv').hidden = true;
+  $('#adv').innerHTML = specs.map((s) => {
+    const unit = s.unit ? `<em>${esc(s.unit)}</em>` : '';
+    let ctl;
+    if (s.kind === 'text') ctl = `<input data-op="contains" placeholder="Chứa…" autocomplete="off">`;
+    else if (s.kind === 'number') ctl = `<div class="range"><input data-op="min" type="number" step="any" placeholder="Từ"><span>–</span><input data-op="max" type="number" step="any" placeholder="Đến"></div>`;
+    else ctl = `<div class="chips">${(s.options || []).map((o) => `<button type="button" class="chip" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
+    return `<div class="field" data-key="${esc(s.key)}"><label>${esc(s.label)}${unit}</label>${ctl}</div>`;
+  }).join('') + `<div class="adv-actions"><button class="btn ghost" type="button" onclick="clearAdv()">Xóa bộ lọc nâng cao</button><button class="btn" type="button" onclick="reload(true)">Áp dụng</button></div>`;
+  $$('#adv .chip').forEach((b) => (b.onclick = () => b.classList.toggle('on')));
+  $$('#adv input').forEach((i) => i.addEventListener('keydown', (e) => e.key === 'Enter' && reload(true)));
+}
+function toggleAdv() { $('#adv').hidden = !$('#adv').hidden; }
+const fieldBox = (k) => $(`#adv .field[data-key="${CSS.escape(k)}"]`);
+
+function readAdv() {
+  const out = {};
+  for (const s of def.advanced || []) {
+    const box = fieldBox(s.key); if (!box) continue;
+    const c = {};
+    if (s.kind === 'text') { const v = $('input', box).value.trim(); if (v) c.contains = v; }
+    else if (s.kind === 'number') {
+      for (const op of ['min', 'max']) {
+        const raw = $(`[data-op="${op}"]`, box).value;
+        if (raw !== '') c[op] = s.percent ? Number(raw) / 100 : Number(raw);     // UI nhập %, API dùng tỷ lệ 0–1
+      }
+    } else { const on = $$('.chip.on', box).map((b) => b.dataset.v); if (on.length) c.in = on; }
+    if (Object.keys(c).length) out[s.key] = c;
+  }
+  return out;
+}
+function setAdv(adv) {
+  for (const s of def.advanced || []) {
+    const c = adv[s.key], box = fieldBox(s.key); if (!c || !box) continue;
+    if (s.kind === 'text') $('input', box).value = c.contains ?? '';
+    else if (s.kind === 'number') for (const op of ['min', 'max']) $(`[data-op="${op}"]`, box).value = c[op] === undefined ? '' : (s.percent ? c[op] * 100 : c[op]);
+    else $$('.chip', box).forEach((b) => b.classList.toggle('on', (c.in || []).includes(b.dataset.v)));
+  }
+  if (Object.keys(adv).length) $('#adv').hidden = false;
+}
+function clearField(k) { const box = fieldBox(k); if (!box) return; $$('input', box).forEach((i) => (i.value = '')); $$('.chip.on', box).forEach((b) => b.classList.remove('on')); }
+function dropAdv(k) { clearField(k); reload(true); }
+function clearAdv() { (def.advanced || []).forEach((s) => clearField(s.key)); reload(true); }
+
+function describe(s, c) {
+  const n = (v) => (s.percent ? nf.format(v * 100) + '%' : nf.format(v) + (s.unit && s.unit !== '%' ? ' ' + s.unit : ''));
+  if (c.contains !== undefined) return `${s.label} chứa “${c.contains}”`;
+  if (c.in) return `${s.label}: ${c.in.join(', ')}`;
+  if (c.min !== undefined && c.max !== undefined) return `${s.label}: ${n(c.min)} – ${n(c.max)}`;
+  return c.min !== undefined ? `${s.label} ≥ ${n(c.min)}` : `${s.label} ≤ ${n(c.max)}`;
+}
+function renderChips(adv) {
+  const keys = Object.keys(adv);
+  const badge = $('#advCount'); if (badge) { badge.textContent = keys.length; badge.hidden = !keys.length; }
+  $('#chips').innerHTML = keys.map((k) => {
+    const s = def.advanced.find((x) => x.key === k);
+    return `<span class="tag">${esc(describe(s, adv[k]))}<button type="button" title="Gỡ bộ lọc" onclick="dropAdv('${esc(k)}')">✕</button></span>`;
+  }).join('') + (keys.length ? `<button class="link" type="button" onclick="clearAdv()">Xóa tất cả</button>` : '');
+  $('#advHint').hidden = !(keys.length && def.columns.some((c) => ['rank_no', 'revenue_share', 'cum_share', 'abc_class'].includes(c.key)));
+}
+
+// ---------- Trạng thái trong URL ----------
+function syncUrl(adv) {
+  const p = new URLSearchParams({ r: def.id, ...filters() });
+  if (Object.keys(adv).length) p.set('adv', JSON.stringify(adv));
+  if (sortBy) { p.set('sortBy', sortBy); p.set('sortDir', sortDir); }
+  history.replaceState(null, '', '?' + p);
+}
+function restore(p) {
+  for (const [k, v] of p) { const el = $('#f_' + k); if (el) el.value = v; }
+  if (p.get('adv')) { try { setAdv(JSON.parse(p.get('adv'))); } catch {} }
+  if (p.get('sortBy')) { sortBy = p.get('sortBy'); sortDir = p.get('sortDir') || 'desc'; }
+}
+
+// ---------- Tải dữ liệu ----------
 function fmt(v, t) {
   if (v === null || v === undefined || v === '') return '';
-  if (t === 'money' || t === 'int') return money.format(Number(v));
+  if (t === 'money' || t === 'int') return nf.format(Number(v));
   if (t === 'percent') return (Number(v) * 100).toFixed(1) + '%';
   if (t === 'date') return new Date(v).toISOString().slice(0, 10);
   if (t === 'datetime') return new Date(v).toISOString().replace('T', ' ').slice(0, 19);
-  return String(v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  return esc(v);
 }
-
 async function reload(reset) {
   if (!def) return;
   if (reset) { page = 1; cursors = [null]; cur = 0; }
+  const adv = readAdv(); renderChips(adv); syncUrl(adv);
   const qs = new URLSearchParams({ ...filters(), limit: def.detail ? 50 : 25, page });
+  if (Object.keys(adv).length) qs.set('adv', JSON.stringify(adv));
   if (sortBy) { qs.set('sortBy', sortBy); qs.set('sortDir', sortDir); }
   if (def.detail && cursors[cur]) qs.set('cursor', cursors[cur]);
   say('Đang tải...');
+  $('#tbody').classList.add('skel');
   try {
     const r = await api(`/admin/reports/${def.id}?${qs}`);
     render(r); say('');
   } catch (e) { say(e.message, true); }
+  $('#tbody').classList.remove('skel');
 }
-
 function render(r) {
   const cols = r.columns;
   $('#thead').innerHTML = '<tr>' + cols.map((c) => {
     const s = def.sortable.includes(c.key), arrow = sortBy === c.key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    return `<th class="${s ? '' : 'nosort'}" ${s ? `onclick="sort('${c.key}')"` : ''}>${c.header}${arrow}</th>`;
+    return `<th class="${s ? '' : 'nosort'}" ${s ? `onclick="sort('${c.key}')"` : ''}>${esc(c.header)}${arrow}</th>`;
   }).join('') + '</tr>';
   $('#tbody').innerHTML = r.rows.length
     ? r.rows.map((row) => '<tr>' + cols.map((c) => `<td class="${['int', 'money', 'percent'].includes(c.type) ? 'n' : ''}">${fmt(row[c.key], c.type)}</td>`).join('') + '</tr>').join('')
-    : `<tr><td colspan="${cols.length}" class="msg">Không có dữ liệu trong khoảng đã chọn.</td></tr>`;
+    : `<tr><td colspan="${cols.length}" class="empty">Không có dữ liệu khớp bộ lọc.</td></tr>`;
 
   const k = [];
   if (!def.detail) {
-    k.push(`<div class="kpi"><small>Số dòng</small><b>${money.format(r.total)}</b></div>`);
-    cols.filter((c) => c.total).forEach((c) => k.push(`<div class="kpi"><small>Tổng ${c.header}</small><b>${fmt(r.sums?.[c.key] ?? 0, c.type)}</b></div>`));
+    k.push(`<div class="card kpi"><small>Số dòng</small><b>${nf.format(r.total)}</b></div>`);
+    cols.filter((c) => c.total).forEach((c) => k.push(`<div class="card kpi"><small>Tổng ${esc(c.header)}</small><b>${fmt(r.sums?.[c.key] ?? 0, c.type)}</b></div>`));
   }
   $('#kpis').innerHTML = k.join('');
 
@@ -196,54 +330,58 @@ function render(r) {
     $('#prev').disabled = cur === 0; $('#next').disabled = !nextCursor || r.rows.length === 0;
   } else {
     const pages = Math.max(1, Math.ceil(r.total / r.limit));
-    $('#pageInfo').textContent = `Trang ${r.page}/${pages} · ${money.format(r.total)} dòng`;
+    $('#pageInfo').textContent = `Trang ${r.page}/${pages} · ${nf.format(r.total)} dòng`;
     $('#prev').disabled = r.page <= 1; $('#next').disabled = r.page >= pages;
   }
 }
-function go(d) {
-  if (def.detail) { if (d > 0) cursors[cur + 1] = nextCursor; cur += d; } else page += d;
-  reload(false);
-}
-function sort(key) {
-  if (sortBy === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc'; else { sortBy = key; sortDir = 'desc'; }
-  reload(true);
-}
+function go(d) { if (def.detail) { if (d > 0) cursors[cur + 1] = nextCursor; cur += d; } else page += d; reload(false); }
+function sort(key) { if (sortBy === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc'; else { sortBy = key; sortDir = 'desc'; } reload(true); }
 
+// ---------- Export (chạy nền, có lọc nâng cao) ----------
 async function doExport(format) {
   if (!def) return;
-  const body = { ...filters(), format, delimiter: $('#delim').value, gzip: $('#gzip').checked };
-  say('Đang tạo file...');
+  const adv = readAdv();
+  const body = { ...filters(), format, delimiter: $('#delim').value, gzip: $('#gzip').checked, ...(Object.keys(adv).length ? { adv } : {}) };
+  say('Đang gửi yêu cầu export...'); $('#prog').hidden = false;
   try {
     const res = await call(`/admin/reports/${def.id}/export`, { method: 'POST', body: JSON.stringify(body) });
     if ((res.headers.get('content-type') || '').includes('application/json')) {
       const j = unwrap(await res.json());
-      if (j.mode === 'async') return pollExport(j.exportId);
+      if (j.mode === 'async') return await pollExport(j.exportId);
     }
-    const blob = await res.blob();
-    const f = filters();
-    save(blob, `${def.id}_${f.from}_${f.to}.${format}`);
-    say('Đã tải xong.');
+    const blob = await res.blob(); const f = filters();
+    save(blob, `${def.id}_${f.from}_${f.to}.${format}`); say('Đã tải xong.');
   } catch (e) { say(e.message, true); }
+  finally { $('#prog').hidden = true; }
 }
-
 async function pollExport(id) {
   for (;;) {
     const s = await api(`/admin/reports/exports/${id}`);
-    if (s.status === 'DONE') {
-      const { url } = await api(`/admin/reports/exports/${id}/link`, { method: 'POST' });
-      say(`Hoàn tất (${money.format(s.rowCount)} dòng). Đang tải...`);
-      location.href = API + url;                  // trình duyệt tải thẳng file lớn, không đi qua bộ nhớ trang
-      return;
-    }
+    if (s.status === 'DONE') { await download(id, s.rowCount); return; }
     if (s.status === 'FAILED' || s.status === 'EXPIRED') return say('Xuất báo cáo thất bại: ' + (s.error || s.status), true);
-    say(`Dữ liệu lớn, đang xử lý nền (${s.status === 'QUEUED' ? 'đang chờ' : 'đang chạy'})... có thể đóng trang và quay lại sau trong lịch sử export.`);
+    say(`Đang xử lý nền (${s.status === 'QUEUED' ? 'đang chờ' : 'đang chạy'})... có thể đóng trang và lấy file sau trong "Lịch sử export".`);
     await new Promise((r) => setTimeout(r, 3000));
   }
 }
-function save(blob, name) {
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+async function download(id, rows) {
+  const { url } = await api(`/admin/reports/exports/${id}/link`, { method: 'POST' });
+  say(`Hoàn tất${rows != null ? ` (${nf.format(rows)} dòng)` : ''}. Đang tải...`);
+  location.href = API + url;                       // trình duyệt tải thẳng file lớn
 }
-function say(t, err) { const s = $('#status'); s.textContent = t; s.className = err ? 'err' : 'msg'; }
+function save(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href); }
+
+async function openHistory() {
+  $('#hist').showModal();
+  $('#histBody').innerHTML = '<p class="msg">Đang tải...</p>';
+  try {
+    const list = await api('/admin/reports/exports');
+    $('#histBody').innerHTML = list.length ? '<table><tbody>' + list.map((e) => `<tr>
+      <td>${esc(e.reportId)}</td><td>${esc(e.format)}</td><td><span class="st ${esc(e.status)}">${esc(e.status)}</span></td>
+      <td class="n">${e.rowCount != null ? nf.format(e.rowCount) : ''}</td><td>${esc(new Date(e.createdAt).toLocaleString('vi-VN'))}</td>
+      <td>${e.status === 'DONE' ? `<button class="btn ghost" onclick="download('${esc(e.id)}')">Tải</button>` : (e.error ? `<span class="err">${esc(e.error)}</span>` : '')}</td></tr>`).join('') + '</tbody></table>'
+      : '<p class="msg">Chưa có lần export nào.</p>';
+  } catch (e) { $('#histBody').innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
 if ($('#token').value) init();
 </script>
 </body>

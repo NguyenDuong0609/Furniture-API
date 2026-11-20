@@ -271,6 +271,15 @@ npm run test:integration    # chạy test/integration với .env.test
 npm run test:bench          # benchmark export 3M dòng
 ```
 
+> **Lưu ý:** Seed bench không xóa data cũ — nó cộng thêm vào DB test. Nếu muốn reset sạch trước khi seed:
+>
+> ```powershell
+> npm run db:test:reset    # xóa và migrate lại
+> npm run prisma:seed:test   # seed dữ liệu cơ bản (users, products)
+> npm run prisma:seed:bench  # seed 1 triệu đơn
+> npm run test:bench
+> ```
+
 ### Helper test
 
 - `test/integration/helpers/db.ts`: `createPrisma()`, `resetDb(prisma)` — xóa data theo thứ tự FK
